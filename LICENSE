@@ -1,0 +1,58 @@
+GrishaKey License 1.0
+
+Copyright (c) 2026 JonnyTech (https://jonnytech.dev)
+
+GrishaKey is free to use, change, and share, as long as the credit to
+JonnyTech stays in place.
+
+1. What you may do
+
+   You may, free of charge and for any purpose, including commercial use:
+   a. use, run, and install GrishaKey;
+   b. change the source code and make your own versions;
+   c. share or sell copies, changed or unchanged.
+
+   You do not have to share your changes or publish your source code.
+
+2. Your own name
+
+   You may show your own organization's name in the app, for example
+   through the APP_NAME and APP_NAME_ACCENT settings.
+
+3. The credit you must keep
+
+   Any copy or changed version that has a user interface must keep this
+   notice visible to users:
+
+       Powered by GrishaKey by JonnyTech
+
+   It must appear at least:
+   a. at the bottom of the main navigation; and
+   b. on the sign-in page and the sign-up page.
+
+   Where links are possible, it must link to https://jonnytech.dev.
+   You may not remove it, hide it, change its wording, or make it hard to read.
+
+4. Notices in the code
+
+   You must keep this license and the copyright notice above in every copy,
+   changed or unchanged.
+
+5. No false claims
+
+   You may not say or imply that you created GrishaKey, or that JonnyTech
+   made, reviewed, or approves your changed version.
+
+6. If you break these terms
+
+   Your permission under this license ends. If you fix the problem within
+   30 days after being notified, your permission comes back.
+
+7. No warranty
+
+   GRISHAKEY IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   JONNYTECH OR ANY CONTRIBUTOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH GRISHAKEY OR ITS USE.

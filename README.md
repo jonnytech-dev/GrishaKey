@@ -291,4 +291,14 @@ The suite covers encryption, labels and tamper detection, login lockout and timi
 - Passphrases use the [EFF Large Wordlist](https://www.eff.org/dice) by the Electronic Frontier Foundation, licensed under [CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/).
 - Built by [JonnyTech](https://github.com/jonnytech-dev) · [Website](https://jonnytech.dev)
 
-<!-- Add a license section here once you choose one (for example MIT). -->
+---
+
+## License
+
+GrishaKey is released under the [GrishaKey License 1.0](LICENSE).
+
+- ✅ Use it for anything, including commercial use
+- ✅ Change it, share it, or sell it, with no need to publish your changes
+- ✅ Show your organization's name with `APP_NAME`
+- 📢 Keep **"Powered by GrishaKey by JonnyTech"** visible at the bottom of the navigation
+  and on the sign-in and sign-up pages, linked to [jonnytech.dev](https://jonnytech.dev)
