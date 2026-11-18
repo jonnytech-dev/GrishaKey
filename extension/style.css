@@ -176,3 +176,9 @@ select { appearance: none; padding-right: 36px; cursor: pointer;
 .gen-mode-btn:hover { color: var(--ink); }
 .gen-mode-btn[aria-pressed="true"] { background: var(--grad); color: #fff; }
 .gen-select { flex: 1; padding-top: 7px; padding-bottom: 7px; font-size: 13px; }
+
+/* Vaults screen */
+.vault-role { font-size: 12px; color: var(--muted); }
+.rename-row { display: flex; gap: 6px; flex: 1; min-width: 0; }
+.rename-row input { flex: 1; min-width: 0; padding: 8px 10px; }
+.rename-row .small-primary { padding: 0 12px; }

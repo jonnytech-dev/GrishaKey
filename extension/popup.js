@@ -136,7 +136,17 @@ function renderItem(login) {
   if (!login.username) copyUser.disabled = true;
   const actions = document.createElement("div");
   actions.className = "actions";
-  actions.append(copyUser, copyPass);
+  const buttons = [copyUser, copyPass];
+  if (login.can_edit) {
+    const edit = document.createElement("button");
+    edit.className = "icon-btn";
+    edit.title = "Edit login";
+    edit.setAttribute("aria-label", "Edit login");
+    edit.append(icon("edit"));
+    edit.addEventListener("click", () => openEditForm(login.id));
+    buttons.push(edit);
+  }
+  actions.append(...buttons);
   item.append(tile, info, actions);
   return item;
 }
@@ -144,6 +154,8 @@ function renderItem(login) {
 async function showLogins() {
   setHeader("home");
   updateAvatar();
+  hide("vaults");
+  editingId = null;
   hide("new");
   hide("login");
   show("list");
@@ -237,6 +249,17 @@ $("pw-show").addEventListener("click", () => {
 // ===== New login (and new vault) =====
 const NEW_VAULT = "__new__";
 
+// The new-login form doubles as the edit form. null = new login, otherwise the login being edited.
+let editingId = null;
+
+function setFormMode(mode) {
+  const editing = mode === "edit";
+  $("formbar-title").textContent = editing ? "Edit login" : "New login";
+  $("nl-submit").textContent = editing ? "Save changes" : "Save login";
+  $("nl-vault-row").classList.toggle("hidden", editing);
+  if (editing) hide("nv-row");
+}
+
 function showNewError(text) {
   $("nl-error").replaceChildren(icon("alert"), text);
   show("nl-error");
@@ -258,7 +281,10 @@ function setPasswordVisible(visible) {
 }
 
 async function openNewForm() {
+  editingId = null;
   setHeader("form");
+  setFormMode("new");
+  hide("vaults");
   hide("list");
   hide("nl-error");
   hide("nv-row");
@@ -294,6 +320,34 @@ async function openNewForm() {
   $("nl-vault").selectedIndex = 0;
   if ($("nl-vault").value === NEW_VAULT) show("nv-row");
   $("nl-title").focus();
+}
+
+async function openEditForm(loginId) {
+  editingId = loginId;
+  setHeader("form");
+  setFormMode("edit");
+  hide("list");
+  hide("vaults");
+  hide("nl-error");
+  hide("gen-panel");
+  show("new");
+  $("new").reset();
+  $("gen-preview").textContent = "";
+  setPasswordVisible(false);
+  try {
+    // Details and password are fetched separately; the password stays hidden until the eye is clicked
+    const details = await api(`/logins/${encodeURIComponent(loginId)}`);
+    const { password } = await api(`/logins/${encodeURIComponent(loginId)}/password`);
+    $("nl-title").value = details.title;
+    $("nl-url").value = details.url;
+    $("nl-username").value = details.username;
+    $("nl-password").value = password;
+    $("nl-notes").value = details.notes;
+    $("nl-title").focus();
+  } catch (err) {
+    if (err.message === "signed-out") handleError(err);
+    else showNewError(err.message);
+  }
 }
 
 $("new-login").addEventListener("click", openNewForm);
@@ -451,6 +505,28 @@ $("gen-use").addEventListener("click", () => {
 $("new").addEventListener("submit", async (event) => {
   event.preventDefault();
   hide("nl-error");
+  if (editingId) {
+    try {
+      await api(`/logins/${encodeURIComponent(editingId)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: $("nl-title").value.trim(),
+          url: $("nl-url").value.trim(),
+          username: $("nl-username").value.trim(),
+          password: $("nl-password").value,
+          notes: $("nl-notes").value,
+        }),
+      });
+      editingId = null;
+      $("nl-password").value = "";
+      await showLogins();
+      showToast("Changes saved");
+    } catch (err) {
+      if (err.message === "signed-out") handleError(err);
+      else showNewError(err.message);
+    }
+    return;
+  }
   if ($("nl-vault").value === NEW_VAULT) { showNewError("Create the vault first, or pick one."); return; }
   try {
     await api("/logins", {
@@ -472,6 +548,114 @@ $("new").addEventListener("submit", async (event) => {
     else showNewError(err.message);
   }
 });
+
+// ===== Vaults screen =====
+function vaultRole(v) {
+  if (v.is_owner) return "Owner";
+  return v.can_edit ? "Shared · can edit" : "Shared · view only";
+}
+
+function renderVaultRow(v) {
+  const item = document.createElement("div");
+  item.className = "item";
+
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  tile.textContent = (v.name || "?").charAt(0).toUpperCase();
+
+  const info = document.createElement("div");
+  info.className = "info";
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = v.name;
+  const role = document.createElement("div");
+  role.className = "vault-role";
+  role.textContent = vaultRole(v);
+  info.append(title, role);
+
+  item.append(tile, info);
+
+  if (v.is_owner) {
+    const edit = document.createElement("button");
+    edit.className = "icon-btn";
+    edit.title = "Rename vault";
+    edit.setAttribute("aria-label", `Rename ${v.name}`);
+    edit.append(icon("edit"));
+    edit.addEventListener("click", () => startRename(item, v));
+    item.append(edit);
+  }
+  return item;
+}
+
+function startRename(item, v) {
+  const row = document.createElement("div");
+  row.className = "rename-row";
+  const input = document.createElement("input");
+  input.value = v.name;
+  input.maxLength = 100;
+  input.setAttribute("aria-label", "Vault name");
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "small-primary";
+  save.textContent = "Save";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "link";
+  cancel.textContent = "Cancel";
+  row.append(input, save, cancel);
+
+  const tile = item.firstElementChild;
+  item.replaceChildren(tile, row);
+  input.focus();
+  input.select();
+
+  cancel.addEventListener("click", showVaults);
+  const submit = async () => {
+    const name = input.value.trim();
+    if (!name) { setVaultsStatus("Give the vault a name.", true); return; }
+    try {
+      await api(`/vaults/${encodeURIComponent(v.id)}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      await showVaults();
+      showToast("Vault renamed");
+    } catch (err) {
+      if (err.message === "signed-out") handleError(err);
+      else setVaultsStatus(err.message, true);
+    }
+  };
+  save.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submit();
+    if (e.key === "Escape") showVaults();
+  });
+}
+
+function setVaultsStatus(text, isError = false) {
+  const status = $("vaults-status");
+  if (isError) status.replaceChildren(icon("alert"), text);
+  else status.textContent = text;
+  status.classList.toggle("error", isError);
+  show("vaults-status");
+}
+
+async function showVaults() {
+  setHeader("form");
+  $("formbar-title").textContent = "Vaults";
+  hide("list");
+  hide("new");
+  hide("vaults-status");
+  show("vaults");
+  $("vault-items").replaceChildren();
+  try {
+    const vaults = await api("/vaults");
+    if (vaults.length === 0) setVaultsStatus("No vaults yet.");
+    vaults.forEach((v) => $("vault-items").append(renderVaultRow(v)));
+  } catch (err) {
+    handleError(err);
+  }
+}
+
+setIcon("open-vaults", "vault");
+$("open-vaults").addEventListener("click", showVaults);
 
 (async function start() {
   if (!(await getServer())) {

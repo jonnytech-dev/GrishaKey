@@ -253,3 +253,65 @@ class Test_Passphrase:
     def test_requires_sign_in(self, setup):
         client, _ = setup
         assert client.get("/api/v1/generate-passphrase").status_code == 401
+
+
+class Test_Edit_Login:
+    def test_details_and_edit(self, setup):
+        client, github = setup
+        token = sign_in(client).json()["token"]
+        details = client.get(f"/api/v1/logins/{github}", headers=bearer(token)).json()
+        assert details["title"] == "GitHub" and details["can_edit"] is True
+        assert "password" not in details
+
+        response = client.put(f"/api/v1/logins/{github}", headers=bearer(token), json={
+            "title": "GitHub (work)", "url": "https://github.com", "username": "jon-work",
+            "password": "New!pw-987654", "notes": "2FA on"})
+        assert response.status_code == 200
+        found = client.get("/api/v1/logins", params={"url": "https://github.com"}, headers=bearer(token)).json()
+        assert found[0]["title"] == "GitHub (work)" and found[0]["username"] == "jon-work"
+        assert found[0]["can_edit"] is True
+        pw = client.get(f"/api/v1/logins/{github}/password", headers=bearer(token)).json()
+        assert pw["password"] == "New!pw-987654"
+
+    def test_empty_title_rejected(self, setup):
+        client, github = setup
+        token = sign_in(client).json()["token"]
+        response = client.put(f"/api/v1/logins/{github}", headers=bearer(token), json={"title": ""})
+        assert response.status_code == 422
+
+    def test_other_user_cannot_edit(self, setup):
+        client, github = setup
+        token = sign_in(client, email="eve@gmail.com").json()["token"]
+        response = client.put(f"/api/v1/logins/{github}", headers=bearer(token), json={"title": "Hacked"})
+        assert response.status_code in (403, 404)
+        assert client.get(f"/api/v1/logins/{github}", headers=bearer(token)).status_code == 404
+
+
+class Test_Rename_Vault:
+    def _personal(self, client, token):
+        return client.get("/api/v1/vaults", headers=bearer(token)).json()[0]["id"]
+
+    def test_rename(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        vault_id = self._personal(client, token)
+        response = client.patch(f"/api/v1/vaults/{vault_id}", headers=bearer(token), json={"name": "Home"})
+        assert response.status_code == 200
+        names = [v["name"] for v in client.get("/api/v1/vaults", headers=bearer(token)).json()]
+        assert names == ["Home"]
+
+    def test_duplicate_name(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        vault_id = self._personal(client, token)
+        client.post("/api/v1/vaults", json={"name": "Work"}, headers=bearer(token))
+        response = client.patch(f"/api/v1/vaults/{vault_id}", headers=bearer(token), json={"name": "Work"})
+        assert response.status_code == 400
+
+    def test_not_owner(self, setup):
+        client, _ = setup
+        jon_token = sign_in(client).json()["token"]
+        vault_id = self._personal(client, jon_token)
+        eve_token = sign_in(client, email="eve@gmail.com").json()["token"]
+        response = client.patch(f"/api/v1/vaults/{vault_id}", headers=bearer(eve_token), json={"name": "Mine"})
+        assert response.status_code in (403, 404)

@@ -90,7 +90,7 @@ def logins_for_page(url: str, session=Depends(current_session)):
     found.sort(key=lambda e: e.title.lower())
     return [
         {"id": e.vault_entry_id, "title": e.title, "username": e.username or "",
-         "vault": names.get(e.vault_id, "Shared with you")}
+         "vault": names.get(e.vault_id, "Shared with you"), "can_edit": e.can_edit}
         for e in found
     ]
 
@@ -120,6 +120,47 @@ class NewLoginBody(BaseModel):
     notes: str = Field(default="", max_length=10000)
 
 
+class EditLoginBody(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    url: str = Field(default="", max_length=2048)
+    username: str = Field(default="", max_length=320)
+    password: str = Field(default="", max_length=1024)
+    notes: str = Field(default="", max_length=10000)
+
+
+class RenameVaultBody(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+@router.get("/logins/{entry_id}")
+def login_details(entry_id: str, session=Depends(current_session)):
+    # Details for the edit form. No password here; it's fetched separately when needed.
+    with _db() as db_connection:
+        entry = vault.get_entry(db_connection, session, entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"id": entry.vault_entry_id, "title": entry.title, "url": entry.url or "",
+            "username": entry.username or "", "notes": entry.notes or "", "can_edit": entry.can_edit}
+
+
+@router.put("/logins/{entry_id}")
+def edit_login(entry_id: str, body: EditLoginBody, session=Depends(current_session)):
+    # Same rules as the app: you need edit rights on this login
+    with _db() as db_connection:
+        try:
+            updated = vault.update_entry(db_connection, session, entry_id, body.title.strip(),
+                                         body.url.strip(), body.username.strip(), body.password,
+                                         body.notes)
+        except PermissionError as err:
+            raise HTTPException(status_code=403, detail=str(err) or "You can't edit this login.")
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err))
+    if not updated:
+        # Same answer for "doesn't exist" and "not yours"
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
 @router.get("/vaults")
 def list_vaults(session=Depends(current_session)):
     # The user's vaults, and whether they can add to each
@@ -135,6 +176,21 @@ def create_vault(body: NewVaultBody, session=Depends(current_session)):
     with _db() as db_connection:
         try:
             vault_id = sharing.create_vault(db_connection, session, body.name)
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err))
+    return {"id": vault_id, "name": body.name.strip()}
+
+
+@router.patch("/vaults/{vault_id}")
+def rename_vault(vault_id: str, body: RenameVaultBody, session=Depends(current_session)):
+    # Same rules as the app: owner only, no duplicate names
+    with _db() as db_connection:
+        try:
+            sharing.rename_vault(db_connection, session, vault_id, body.name.strip())
+        except PermissionError as err:
+            raise HTTPException(status_code=403, detail=str(err) or "Only the owner can rename this vault.")
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Not found")
         except ValueError as err:
             raise HTTPException(status_code=400, detail=str(err))
     return {"id": vault_id, "name": body.name.strip()}
