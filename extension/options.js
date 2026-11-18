@@ -30,3 +30,30 @@ document.getElementById("save").addEventListener("click", async () => {
     result.classList.add("error");
   }
 });
+
+// Opt-in: in-page autofill needs access to all websites, so it's off until the user turns it on
+const inlineBox = document.getElementById("inline");
+const inlineResult = document.getElementById("inline-result");
+
+chrome.storage.local.get("inlineEnabled").then(({ inlineEnabled }) => {
+  inlineBox.checked = Boolean(inlineEnabled);
+});
+
+inlineBox.addEventListener("change", async () => {
+  inlineResult.classList.remove("error");
+  try {
+    if (inlineBox.checked) {
+      const granted = await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
+      if (!granted) throw new Error("Access wasn't allowed, so the icon can't appear on websites.");
+    }
+    const reply = await chrome.runtime.sendMessage({ type: "gk-set-inline", enabled: inlineBox.checked });
+    if (reply?.error) throw new Error(reply.error);
+    inlineResult.textContent = inlineBox.checked
+      ? "On. Reload any open login pages to see the icon."
+      : "Off. The icon won't appear on websites.";
+  } catch (err) {
+    inlineBox.checked = false;
+    inlineResult.textContent = err.message;
+    inlineResult.classList.add("error");
+  }
+});

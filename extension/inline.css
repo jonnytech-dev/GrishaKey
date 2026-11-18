@@ -1,0 +1,29 @@
+/* The dropdown under a login field, in GrishaKey green */
+:root {
+  --grad: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+  --ink: #0f172a; --text: #334155; --muted: #64748b; --line: #e2e8f0;
+  --bg: #ffffff; --tint: #e8f8ee; --hover: #f1f5f9; --red: #b91c1c;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #f1f5f9; --text: #cbd5e1; --muted: #94a3b8; --line: #1e293b;
+          --bg: #111a2e; --tint: #14302a; --hover: #1e293b; --red: #fca5a5; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text);
+       background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px; overflow-y: auto; }
+.head { display: flex; align-items: center; justify-content: space-between; }
+.brand { font-weight: 800; font-size: 15px; color: var(--ink); letter-spacing: -0.02em; }
+.brand span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.close { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 4px; }
+.site { font-size: 11px; color: var(--muted); margin: 4px 0 8px; }
+.item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px;
+        background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.item:hover, .item:focus-visible { background: var(--hover); outline: none; }
+.tile { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+        background: var(--tint); color: #00994C; font-weight: 800; flex-shrink: 0; }
+.info { min-width: 0; }
+.title { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msg { color: var(--muted); margin: 6px 2px; }
+.error { color: var(--red); }

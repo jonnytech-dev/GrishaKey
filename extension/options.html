@@ -13,6 +13,15 @@
     <input id="server" type="url" placeholder="http://127.0.0.1:9500">
     <button class="primary" id="save">Save and allow access</button>
     <p class="msg" id="result"></p>
+    <hr style="border: 0; border-top: 1px solid var(--line); margin: 20px 0;">
+    <label style="display:flex; gap:10px; align-items:flex-start; font-weight:500;">
+      <input type="checkbox" id="inline" style="width:auto; margin-top:3px;">
+      <span>Show GrishaKey in login fields<br>
+        <span class="msg" style="padding:0;">Adds a GrishaKey icon to password fields so you can fill logins with a click.
+        Your browser will ask for access to all websites. Your logins are never shown to the websites themselves.</span>
+      </span>
+    </label>
+    <p class="msg" id="inline-result"></p>
   </main>
   <script src="options.js"></script>
 </body>
