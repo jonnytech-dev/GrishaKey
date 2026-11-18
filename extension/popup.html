@@ -82,6 +82,59 @@
         <button type="button" class="icon-btn" id="nl-gen" aria-label="Generate password" title="Generate a strong password"></button>
       </div>
 
+      <!-- Password generator options (opened with the dice button) -->
+      <div id="gen-panel" class="gen-panel hidden">
+        <!-- Characters or words (passphrase), same choice as the app's generator page -->
+        <div class="gen-mode" role="group" aria-label="Password type">
+          <button type="button" class="gen-mode-btn" id="gen-mode-password" aria-pressed="true">Characters</button>
+          <button type="button" class="gen-mode-btn" id="gen-mode-passphrase" aria-pressed="false">Words</button>
+        </div>
+        <div class="gen-preview-row">
+          <code id="gen-preview" class="gen-preview"></code>
+          <button type="button" class="icon-btn ghost" id="gen-refresh" aria-label="Generate another" title="Generate another"></button>
+        </div>
+
+        <!-- Characters options -->
+        <div id="gen-password-opts">
+          <div class="gen-length">
+            <label for="gen-length" style="margin:0;">Length</label>
+            <input id="gen-length" type="range" min="8" max="64" value="20">
+            <span id="gen-length-value" class="gen-length-value">20</span>
+          </div>
+          <div class="gen-sets">
+            <label class="gen-check"><input type="checkbox" id="gen-upper" checked> A–Z</label>
+            <label class="gen-check"><input type="checkbox" id="gen-lower" checked> a–z</label>
+            <label class="gen-check"><input type="checkbox" id="gen-digits" checked> 0–9</label>
+            <label class="gen-check"><input type="checkbox" id="gen-symbols" checked> !@#</label>
+          </div>
+        </div>
+
+        <!-- Words options -->
+        <div id="gen-passphrase-opts" class="hidden">
+          <div class="gen-length">
+            <label for="gen-words" style="margin:0;">Words</label>
+            <input id="gen-words" type="range" min="3" max="12" value="5">
+            <span id="gen-words-value" class="gen-length-value">5</span>
+          </div>
+          <div class="gen-length">
+            <label for="gen-separator" style="margin:0;">Separator</label>
+            <select id="gen-separator" class="gen-select">
+              <option value="-">Dash ( - )</option>
+              <option value=" ">Space</option>
+              <option value=".">Period ( . )</option>
+              <option value="_">Underscore ( _ )</option>
+            </select>
+          </div>
+          <div class="gen-sets">
+            <label class="gen-check"><input type="checkbox" id="gen-capitalize" checked> Capitalize words</label>
+            <label class="gen-check"><input type="checkbox" id="gen-number" checked> Add a number</label>
+          </div>
+        </div>
+        <div class="gen-actions">
+          <button type="button" class="small-primary" id="gen-use">Use password</button>
+        </div>
+      </div>
+
       <label for="nl-notes">Notes</label>
       <textarea id="nl-notes" maxlength="10000" rows="3"></textarea>
 
@@ -116,6 +169,7 @@
   <template id="icon-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></template>
   <template id="icon-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></template>
   <template id="icon-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></template>
+  <template id="icon-refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg></template>
   <template id="icon-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></template>
 
   <script src="popup.js"></script>

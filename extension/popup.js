@@ -240,6 +240,7 @@ const NEW_VAULT = "__new__";
 function showNewError(text) {
   $("nl-error").replaceChildren(icon("alert"), text);
   show("nl-error");
+  $("nl-error").scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function addVaultOption(id, name, select = false) {
@@ -261,6 +262,8 @@ async function openNewForm() {
   hide("list");
   hide("nl-error");
   hide("nv-row");
+  hide("gen-panel");
+  $("gen-preview").textContent = "";
   show("new");
   $("new").reset();
   setPasswordVisible(false);
@@ -325,15 +328,124 @@ $("nl-show").addEventListener("click", () => {
   setPasswordVisible($("nl-password").type === "password");
 });
 
-$("nl-gen").addEventListener("click", async () => {
+// ===== Password generator panel =====
+const GEN_DEFAULTS = {
+  mode: "password",
+  length: 20, upper: true, lower: true, digits: true, symbols: true,
+  words: 5, separator: "-", capitalize: true, number: true,
+};
+const GEN_SETS = ["upper", "lower", "digits", "symbols"];
+const GEN_SEPARATORS = ["-", " ", ".", "_"];
+let genTimer = null;
+let genRequest = 0;         // number of the latest preview request
+let genMode = "password";   // "password" (characters) or "passphrase" (words)
+
+function genOptions() {
+  const options = { mode: genMode, length: Number($("gen-length").value) };
+  GEN_SETS.forEach((name) => { options[name] = $(`gen-${name}`).checked; });
+  options.words = Number($("gen-words").value);
+  options.separator = $("gen-separator").value;
+  options.capitalize = $("gen-capitalize").checked;
+  options.number = $("gen-number").checked;
+  return options;
+}
+
+// Show the options for characters or for words, and mark the active switch button
+function setGenMode(mode) {
+  genMode = mode === "passphrase" ? "passphrase" : "password";
+  $("gen-mode-password").setAttribute("aria-pressed", String(genMode === "password"));
+  $("gen-mode-passphrase").setAttribute("aria-pressed", String(genMode === "passphrase"));
+  $("gen-password-opts").classList.toggle("hidden", genMode !== "password");
+  $("gen-passphrase-opts").classList.toggle("hidden", genMode !== "passphrase");
+}
+
+async function loadGenOptions() {
+  // Only the options are remembered, never a password
+  const { genOptions: saved } = await chrome.storage.local.get("genOptions");
+  const options = { ...GEN_DEFAULTS, ...(saved || {}) };
+  $("gen-length").value = options.length;
+  $("gen-length-value").textContent = $("gen-length").value;
+  GEN_SETS.forEach((name) => { $(`gen-${name}`).checked = Boolean(options[name]); });
+  $("gen-words").value = options.words;
+  $("gen-words-value").textContent = $("gen-words").value;
+  $("gen-separator").value = GEN_SEPARATORS.includes(options.separator) ? options.separator : "-";
+  $("gen-capitalize").checked = Boolean(options.capitalize);
+  $("gen-number").checked = Boolean(options.number);
+  setGenMode(options.mode);
+}
+
+async function refreshPreview() {
+  const options = genOptions();
+  chrome.storage.local.set({ genOptions: options });
+  // Each mode sends only its own options
+  const path = genMode === "passphrase" ? "/generate-passphrase" : "/generate";
+  const keys = genMode === "passphrase"
+    ? ["words", "separator", "capitalize", "number"]
+    : ["length", ...GEN_SETS];
+  const query = new URLSearchParams(keys.map((k) => [k, String(options[k])]));
+  const request = ++genRequest;
   try {
-    const { password } = await api("/generate?length=20");
-    $("nl-password").value = password;
-    setPasswordVisible(true);
+    const { password } = await api(`${path}?${query}`);
+    // Ignore a slow reply if a newer request was sent since (e.g. after switching modes)
+    if (request !== genRequest) return;
+    $("gen-preview").textContent = password;
   } catch (err) {
     if (err.message === "signed-out") handleError(err);
     else showNewError(err.message);
   }
+}
+
+function refreshSoon() {
+  clearTimeout(genTimer);
+  genTimer = setTimeout(refreshPreview, 150);
+}
+
+setIcon("gen-refresh", "refresh");
+
+$("nl-gen").addEventListener("click", async () => {
+  if (!$("gen-panel").classList.contains("hidden")) {
+    hide("gen-panel");
+    return;
+  }
+  await loadGenOptions();
+  show("gen-panel");
+  await refreshPreview();
+});
+
+$("gen-length").addEventListener("input", () => {
+  $("gen-length-value").textContent = $("gen-length").value;
+  refreshSoon();
+});
+
+GEN_SETS.forEach((name) => {
+  $(`gen-${name}`).addEventListener("change", () => {
+    // At least one set must stay on
+    if (!GEN_SETS.some((n) => $(`gen-${n}`).checked)) $(`gen-${name}`).checked = true;
+    refreshSoon();
+  });
+});
+
+$("gen-words").addEventListener("input", () => {
+  $("gen-words-value").textContent = $("gen-words").value;
+  refreshSoon();
+});
+
+["gen-separator", "gen-capitalize", "gen-number"].forEach((id) => {
+  $(id).addEventListener("change", refreshSoon);
+});
+
+$("gen-mode-password").addEventListener("click", () => { setGenMode("password"); refreshPreview(); });
+$("gen-mode-passphrase").addEventListener("click", () => { setGenMode("passphrase"); refreshPreview(); });
+
+$("gen-refresh").addEventListener("click", refreshPreview);
+
+$("gen-use").addEventListener("click", () => {
+  const password = $("gen-preview").textContent;
+  if (!password) return;
+  $("nl-password").value = password;
+  setPasswordVisible(true);
+  hide("gen-panel");
+  $("gen-preview").textContent = "";
 });
 
 $("new").addEventListener("submit", async (event) => {

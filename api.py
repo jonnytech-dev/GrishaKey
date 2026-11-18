@@ -12,6 +12,11 @@ from core import auth, generator, match, sessions, sharing, storage, vault
 router = APIRouter(prefix="/api/v1")
 _db_path: Path | None = None
 
+# Word list for passphrases, loaded once (empty if the file is missing), same file as the app
+_wordlist = generator.load_wordlist(Path(__file__).resolve().parent / "core" / "wordlists" / "eff_large_wordlist.txt")
+# The separators the app offers: dash, space, period, underscore
+PASSPHRASE_SEPARATORS = ("-", " ", ".", "_")
+
 
 def setup(db_path: Path) -> None:
     # main.py (and tests) tell the API where the database is
@@ -151,9 +156,30 @@ def create_login(body: NewLoginBody, session=Depends(current_session)):
 
 
 @router.get("/generate")
-def generate(length: int = 20, session=Depends(current_session)):
-    # A strong password from the same generator the app uses
+def generate(length: int = 20, upper: bool = True, lower: bool = True,
+             digits: bool = True, symbols: bool = True, session=Depends(current_session)):
+    # A strong password from the same generator the app uses, with the chosen character sets
+    if not (upper or lower or digits or symbols):
+        raise HTTPException(status_code=400, detail="Pick at least one type of character.")
     try:
-        return {"password": generator.generate_password(length)}
+        password = generator.generate_password(length, upper=upper, lower=lower,
+                                               digits=digits, symbols=symbols)
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err))
+    return {"password": password}
+
+
+@router.get("/generate-passphrase")
+def generate_passphrase(words: int = 5, separator: str = "-", capitalize: bool = True,
+                        number: bool = True, session=Depends(current_session)):
+    # Random words from the EFF list, with the same options as the app's generator page
+    if not _wordlist:
+        raise HTTPException(status_code=503, detail="Passphrases need the word list file on the server.")
+    if separator not in PASSPHRASE_SEPARATORS:
+        raise HTTPException(status_code=400, detail="Pick a dash, space, period, or underscore.")
+    try:
+        passphrase = generator.generate_passphrase(_wordlist, count=words, separator=separator,
+                                                   capitalize=capitalize, include_number=number)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    return {"password": passphrase}

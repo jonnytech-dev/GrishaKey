@@ -194,3 +194,62 @@ class Test_Generate:
         client, _ = setup
         token = sign_in(client).json()["token"]
         assert client.get("/api/v1/generate", params={"length": 3}, headers=bearer(token)).status_code == 400
+
+    def test_digits_only(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        password = client.get("/api/v1/generate", headers=bearer(token), params={
+            "length": 16, "upper": False, "lower": False, "digits": True, "symbols": False}).json()["password"]
+        assert len(password) == 16 and password.isdigit()
+
+    def test_no_sets_rejected(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        response = client.get("/api/v1/generate", headers=bearer(token), params={
+            "upper": False, "lower": False, "digits": False, "symbols": False})
+        assert response.status_code == 400
+
+
+class Test_Passphrase:
+    def test_default_passphrase(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        response = client.get("/api/v1/generate-passphrase", headers=bearer(token))
+        assert response.status_code == 200
+        passphrase = response.json()["password"]
+        assert any(ch.isdigit() for ch in passphrase)          # "Add a number" is on by default
+        assert passphrase[0].isupper()                         # "Capitalize" is on by default
+
+    def test_word_count_and_separator(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        # Period, because a few EFF words contain a dash (t-shirt, yo-yo)
+        passphrase = client.get("/api/v1/generate-passphrase", headers=bearer(token), params={
+            "words": 7, "separator": ".", "capitalize": False, "number": False}).json()["password"]
+        parts = passphrase.split(".")
+        assert len(parts) == 7
+        assert all(part == part.lower() and not any(ch.isdigit() for ch in part) for part in parts)
+
+    def test_space_separator(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        passphrase = client.get("/api/v1/generate-passphrase", headers=bearer(token), params={
+            "words": 4, "separator": " "}).json()["password"]
+        assert len(passphrase.split(" ")) == 4
+
+    def test_bad_word_count(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        for words in (2, 13):
+            response = client.get("/api/v1/generate-passphrase", headers=bearer(token), params={"words": words})
+            assert response.status_code == 400
+
+    def test_bad_separator(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        response = client.get("/api/v1/generate-passphrase", headers=bearer(token), params={"separator": "x"})
+        assert response.status_code == 400
+
+    def test_requires_sign_in(self, setup):
+        client, _ = setup
+        assert client.get("/api/v1/generate-passphrase").status_code == 401
