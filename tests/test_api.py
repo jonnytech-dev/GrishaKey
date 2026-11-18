@@ -315,3 +315,24 @@ class Test_Rename_Vault:
         eve_token = sign_in(client, email="eve@gmail.com").json()["token"]
         response = client.patch(f"/api/v1/vaults/{vault_id}", headers=bearer(eve_token), json={"name": "Mine"})
         assert response.status_code in (403, 404)
+
+
+class Test_Trash_Login:
+    def test_owner_flags_and_trash(self, setup):
+        client, github = setup
+        token = sign_in(client).json()["token"]
+        found = client.get("/api/v1/logins", params={"url": "https://github.com"}, headers=bearer(token)).json()
+        assert found[0]["can_delete"] is True
+
+        assert client.delete(f"/api/v1/logins/{github}", headers=bearer(token)).status_code == 200
+        found = client.get("/api/v1/logins", params={"url": "https://github.com"}, headers=bearer(token)).json()
+        assert found == []                                    # trashed logins are hidden
+
+    def test_other_user_cannot_trash(self, setup):
+        client, github = setup
+        token = sign_in(client, email="eve@gmail.com").json()["token"]
+        assert client.delete(f"/api/v1/logins/{github}", headers=bearer(token)).status_code in (403, 404)
+
+    def test_requires_sign_in(self, setup):
+        client, github = setup
+        assert client.delete(f"/api/v1/logins/{github}").status_code == 401

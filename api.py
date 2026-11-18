@@ -84,13 +84,16 @@ def logout(authorization: str | None = Header(default=None)):
 def logins_for_page(url: str, session=Depends(current_session)):
     # Logins that match this page. Titles and usernames only, never passwords.
     with _db() as db_connection:
-        names = {v.vault_id: v.name for v in sharing.list_vaults(db_connection, session)}
+        vaults = sharing.list_vaults(db_connection, session)
         entries = vault.list_entries(db_connection, session)
+    names = {v.vault_id: v.name for v in vaults}
+    owned = {v.vault_id for v in vaults if v.is_owner}
     found = [e for e in entries if match.url_matches(e.url, url)]
     found.sort(key=lambda e: e.title.lower())
     return [
         {"id": e.vault_entry_id, "title": e.title, "username": e.username or "",
-         "vault": names.get(e.vault_id, "Shared with you"), "can_edit": e.can_edit}
+         "vault": names.get(e.vault_id, "Shared with you"), "can_edit": e.can_edit,
+         "can_delete": e.vault_id in owned}
         for e in found
     ]
 
@@ -157,6 +160,21 @@ def edit_login(entry_id: str, body: EditLoginBody, session=Depends(current_sessi
             raise HTTPException(status_code=400, detail=str(err))
     if not updated:
         # Same answer for "doesn't exist" and "not yours"
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True}
+
+
+@router.delete("/logins/{entry_id}")
+def trash_login(entry_id: str, session=Depends(current_session)):
+    # Moves the login to the Trash (restorable in the app). Only the vault owner can do this.
+    with _db() as db_connection:
+        try:
+            moved = vault.trash_entry(db_connection, session, entry_id)
+        except PermissionError as err:
+            raise HTTPException(status_code=403, detail=str(err) or "Only the vault owner can delete this login.")
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Not found")
+    if moved is False:
         raise HTTPException(status_code=404, detail="Not found")
     return {"ok": True}
 

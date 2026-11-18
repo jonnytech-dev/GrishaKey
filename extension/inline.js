@@ -37,10 +37,34 @@ function renderItem(login) {
       message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
     }
   });
-  return button;
+
+  const row = document.createElement("div");
+  row.className = "item-row";
+  row.append(button);
+
+  const menuItems = [];
+  if (login.can_edit) menuItems.push({ label: "Edit", onSelect: () => send({ type: "gk-open-editor", mode: "edit", entryId: login.id }) });
+  if (login.can_delete) menuItems.push({ label: "Move to Trash", danger: true, onSelect: () => trashLogin(login) });
+  if (menuItems.length) row.append(moreButton(`More options for ${login.title}`, menuItems));
+  return row;
 }
 
-(async function start() {
+async function trashLogin(login) {
+  const yes = await confirmBox(`Move "${login.title}" to the Trash?`, "Move to Trash");
+  if (!yes) return;
+  const reply = await send({ type: "gk-delete", entryId: login.id });
+  if (reply?.error) {
+    message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
+    return;
+  }
+  $("items").replaceChildren();
+  message("");
+  await loadLogins();
+}
+
+$("new-login").addEventListener("click", () => send({ type: "gk-open-editor", mode: "new" }));
+
+async function loadLogins() {
   const reply = await send({ type: "gk-get-logins" });
   if (reply?.error) {
     message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
@@ -59,7 +83,9 @@ function renderItem(login) {
   }
   reply.logins.forEach((login) => $("items").append(renderItem(login)));
   $("items").querySelector("button")?.focus();
-})();
+}
+
+loadLogins();
 
 $("close").addEventListener("click", () => send({ type: "gk-close" }));
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") send({ type: "gk-close" }); });

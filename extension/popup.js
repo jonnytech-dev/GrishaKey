@@ -2,6 +2,10 @@
 // Server data is only ever put on the page with textContent (never innerHTML).
 
 const $ = (id) => document.getElementById(id);
+
+// Opened as a separate window from the in-page dropdown (Edit or + New login)
+const pageParams = new URLSearchParams(location.search);
+const windowMode = pageParams.get("mode");            // "new", "edit", or null (normal popup)
 const show = (id) => $(id).classList.remove("hidden");
 const hide = (id) => $(id).classList.add("hidden");
 
@@ -137,18 +141,37 @@ function renderItem(login) {
   const actions = document.createElement("div");
   actions.className = "actions";
   const buttons = [copyUser, copyPass];
-  if (login.can_edit) {
-    const edit = document.createElement("button");
-    edit.className = "icon-btn";
-    edit.title = "Edit login";
-    edit.setAttribute("aria-label", "Edit login");
-    edit.append(icon("edit"));
-    edit.addEventListener("click", () => openEditForm(login.id));
-    buttons.push(edit);
-  }
+  const menuItems = [];
+  if (login.can_edit) menuItems.push({ label: "Edit", onSelect: () => openEditForm(login.id) });
+  if (login.can_delete) menuItems.push({ label: "Move to Trash", danger: true, onSelect: () => trashLogin(login) });
+  if (menuItems.length) buttons.push(moreButton(`More options for ${login.title}`, menuItems));
   actions.append(...buttons);
   item.append(tile, info, actions);
   return item;
+}
+
+async function trashLogin(login) {
+  const yes = await confirmBox(`Move "${login.title}" to the Trash? You can restore it in GrishaKey.`, "Move to Trash");
+  if (!yes) return;
+  try {
+    await api(`/logins/${encodeURIComponent(login.id)}`, { method: "DELETE" });
+    await showLogins();
+    showToast("Moved to Trash");
+  } catch (err) {
+    if (err.message === "signed-out") handleError(err);
+    else setStatus(err.message, true);
+  }
+}
+
+// First screen after start-up or sign-in: the form when opened as a window, otherwise the list
+async function showStartScreen() {
+  if (windowMode === "new") {
+    await openNewForm(pageParams.get("site"));
+  } else if (windowMode === "edit" && pageParams.get("id")) {
+    await openEditForm(pageParams.get("id"));
+  } else {
+    await showLogins();
+  }
 }
 
 async function showLogins() {
@@ -211,7 +234,7 @@ $("login").addEventListener("submit", async (event) => {
     });
     $("password").value = "";
     await chrome.storage.session.set({ token, email: $("email").value.trim() });
-    await showLogins();
+    await showStartScreen();
   } catch (err) {
     $("login-error").replaceChildren(icon("alert"), err.message === "signed-out" ? "Incorrect email or password" : err.message);
     show("login-error");
@@ -239,7 +262,10 @@ updateThemeIcon();
 
 $("toast-close").addEventListener("click", () => hide("toast"));
 $("theme-toggle").addEventListener("click", async () => { await toggleTheme(); updateThemeIcon(); });
-$("nl-back").addEventListener("click", showLogins);
+$("nl-back").addEventListener("click", () => {
+  if (windowMode) { window.close(); return; }
+  showLogins();
+});
 $("pw-show").addEventListener("click", () => {
   const hidden = $("password").type === "password";
   $("password").type = hidden ? "text" : "password";
@@ -280,7 +306,7 @@ function setPasswordVisible(visible) {
   setIcon("nl-show", visible ? "eye-off" : "eye");
 }
 
-async function openNewForm() {
+async function openNewForm(prefillUrl = null) {
   editingId = null;
   setHeader("form");
   setFormMode("new");
@@ -295,7 +321,7 @@ async function openNewForm() {
   setPasswordVisible(false);
 
   // Prefill from the current tab: the site's origin only, never the full address
-  const url = await currentTabUrl();
+  const url = prefillUrl || await currentTabUrl();
   try {
     const page = new URL(url);
     if (page.protocol === "http:" || page.protocol === "https:") {
@@ -350,8 +376,11 @@ async function openEditForm(loginId) {
   }
 }
 
-$("new-login").addEventListener("click", openNewForm);
-$("nl-cancel").addEventListener("click", showLogins);
+$("new-login").addEventListener("click", () => openNewForm());
+$("nl-cancel").addEventListener("click", () => {
+  if (windowMode) { window.close(); return; }
+  showLogins();
+});
 
 $("nl-vault").addEventListener("change", () => {
   if ($("nl-vault").value === NEW_VAULT) {
@@ -519,6 +548,7 @@ $("new").addEventListener("submit", async (event) => {
       });
       editingId = null;
       $("nl-password").value = "";
+      if (windowMode) { window.close(); return; }
       await showLogins();
       showToast("Changes saved");
     } catch (err) {
@@ -541,6 +571,7 @@ $("new").addEventListener("submit", async (event) => {
       }),
     });
     $("nl-password").value = "";
+    if (windowMode) { window.close(); return; }
     await showLogins();
     showToast("Login saved");
   } catch (err) {
@@ -664,7 +695,7 @@ $("open-vaults").addEventListener("click", showVaults);
     return;
   }
   if (await getToken()) {
-    await showLogins();
+    await showStartScreen();
   } else {
     showLogin();
   }

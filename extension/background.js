@@ -13,13 +13,16 @@ async function getToken() {
   return token || null;
 }
 
-async function api(path) {
+async function api(path, options = {}) {
   const server = await getServer();
   const token = await getToken();
   if (!server || !token) throw new Error("signed-out");
   let response;
   try {
-    response = await fetch(`${server}/api/v1${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    response = await fetch(`${server}/api/v1${path}`, {
+      method: options.method || "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
   } catch {
     throw new Error("Can't reach your GrishaKey server.");
   }
@@ -61,6 +64,9 @@ async function setInline(enabled) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
+    // Messages from the in-page dropdown must come from our own inline.html frame
+    const fromInline = sender.id === chrome.runtime.id &&
+      (sender.url || "").startsWith(chrome.runtime.getURL("inline.html"));
     try {
       // From content.js: a GrishaKey icon was clicked in this frame
       if (message.type === "gk-open") {
@@ -108,6 +114,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.type === "gk-close") {
         const ctx = sender.tab ? await getContext(sender.tab.id) : null;
         if (ctx) await chrome.tabs.sendMessage(sender.tab.id, { type: "gk-close" }, { frameId: ctx.frameId });
+        sendResponse({ ok: true });
+        return;
+      }
+
+      // From inline.js: open the form in a small extension window
+      if (message.type === "gk-open-editor") {
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
+        const params = new URLSearchParams({ site: new URL(ctx.url).origin });
+        if (message.mode === "edit") {
+          // Only logins that match the clicked site can be opened from this page
+          const logins = await api(`/logins?url=${encodeURIComponent(ctx.url)}`);
+          const login = logins.find((l) => l.id === message.entryId);
+          if (!login || !login.can_edit) throw new Error("That login can't be edited here.");
+          params.set("mode", "edit");
+          params.set("id", login.id);
+        } else {
+          params.set("mode", "new");
+        }
+        await chrome.windows.create({
+          url: chrome.runtime.getURL(`popup.html?${params}`),
+          type: "popup", width: 400, height: 680,
+        });
+        sendResponse({ ok: true });
+        return;
+      }
+
+      // From inline.js: move a login to the Trash
+      if (message.type === "gk-delete") {
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
+        const logins = await api(`/logins?url=${encodeURIComponent(ctx.url)}`);
+        const login = logins.find((l) => l.id === message.entryId);
+        if (!login || !login.can_delete) throw new Error("That login can't be deleted here.");
+        await api(`/logins/${encodeURIComponent(login.id)}`, { method: "DELETE" });
         sendResponse({ ok: true });
         return;
       }

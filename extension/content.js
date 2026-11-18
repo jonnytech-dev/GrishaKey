@@ -54,7 +54,7 @@
       top: `${window.scrollY + box.bottom + 6}px`,
       left: `${window.scrollX + Math.max(8, box.left)}px`,
       width: "300px",
-      height: "260px",
+      height: "320px",
       border: "0",
       borderRadius: "14px",
       boxShadow: "0 20px 50px -12px rgba(0,0,0,0.35)",
