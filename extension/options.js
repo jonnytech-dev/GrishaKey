@@ -57,3 +57,16 @@ inlineBox.addEventListener("change", async () => {
     inlineResult.classList.add("error");
   }
 });
+
+// Theme button (bottom right): same as the popup
+const themeButton = document.getElementById("theme-toggle");
+function updateThemeIcon() {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark"
+    : !window.matchMedia("(prefers-color-scheme: light)").matches;
+  const name = dark ? "sun" : "moon";
+  themeButton.replaceChildren(document.getElementById(`icon-${name}`).content.firstElementChild.cloneNode(true));
+}
+themeButton.addEventListener("click", async () => { await toggleTheme(); updateThemeIcon(); });
+chrome.storage.onChanged.addListener(() => setTimeout(updateThemeIcon, 0));
+updateThemeIcon();

@@ -112,3 +112,85 @@ class Test_Password:
         client, github = setup
         token = sign_in(client, email="eve@gmail.com").json()["token"]
         assert client.get(f"/api/v1/logins/{github}/password", headers=bearer(token)).status_code == 404
+
+
+class Test_Vaults:
+    def test_list_vaults(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        vaults = client.get("/api/v1/vaults", headers=bearer(token)).json()
+        assert [v["name"] for v in vaults] == ["Personal"]
+        assert vaults[0]["can_edit"] is True
+
+    def test_create_vault(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        response = client.post("/api/v1/vaults", json={"name": "Work"}, headers=bearer(token))
+        assert response.status_code == 201
+        names = [v["name"] for v in client.get("/api/v1/vaults", headers=bearer(token)).json()]
+        assert "Work" in names
+
+    def test_duplicate_vault_name(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        client.post("/api/v1/vaults", json={"name": "Work"}, headers=bearer(token))
+        assert client.post("/api/v1/vaults", json={"name": "work"}, headers=bearer(token)).status_code == 400
+
+    def test_empty_vault_name(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        assert client.post("/api/v1/vaults", json={"name": ""}, headers=bearer(token)).status_code == 422
+
+
+class Test_Create_Login:
+    def _personal(self, client, token):
+        return client.get("/api/v1/vaults", headers=bearer(token)).json()[0]["id"]
+
+    def test_create_and_find(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        vault_id = self._personal(client, token)
+        response = client.post("/api/v1/logins", headers=bearer(token), json={
+            "vault_id": vault_id, "title": "Netflix", "url": "https://netflix.com",
+            "username": "jon", "password": " spaced pw ", "notes": ""})
+        assert response.status_code == 201
+        found = client.get("/api/v1/logins", params={"url": "https://www.netflix.com/login"},
+                           headers=bearer(token)).json()
+        assert [f["title"] for f in found] == ["Netflix"]
+        entry_id = response.json()["id"]
+        pw = client.get(f"/api/v1/logins/{entry_id}/password", headers=bearer(token)).json()
+        assert pw["password"] == " spaced pw "      # spaces kept
+
+    def test_title_required(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        vault_id = self._personal(client, token)
+        response = client.post("/api/v1/logins", headers=bearer(token),
+                               json={"vault_id": vault_id, "title": ""})
+        assert response.status_code == 422
+
+    def test_cannot_add_to_someone_elses_vault(self, setup):
+        client, _ = setup
+        jon_token = sign_in(client).json()["token"]
+        jon_vault = self._personal(client, jon_token)
+        eve_token = sign_in(client, email="eve@gmail.com").json()["token"]
+        response = client.post("/api/v1/logins", headers=bearer(eve_token),
+                               json={"vault_id": jon_vault, "title": "Sneaky"})
+        assert response.status_code in (400, 403)
+
+    def test_requires_sign_in(self, setup):
+        client, _ = setup
+        assert client.post("/api/v1/logins", json={"vault_id": "x", "title": "y"}).status_code == 401
+
+
+class Test_Generate:
+    def test_generate(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        password = client.get("/api/v1/generate", params={"length": 24}, headers=bearer(token)).json()["password"]
+        assert len(password) == 24
+
+    def test_bad_length(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        assert client.get("/api/v1/generate", params={"length": 3}, headers=bearer(token)).status_code == 400

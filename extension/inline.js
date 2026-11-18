@@ -50,7 +50,9 @@ function renderItem(login) {
     message("Click the GrishaKey toolbar icon to sign in.");
     return;
   }
-  $("site").textContent = `Logins for ${reply.host}`;
+  const strong = document.createElement("strong");
+  strong.textContent = reply.host;
+  $("site").replaceChildren("Logins for ", strong);
   if (reply.logins.length === 0) {
     message("No saved logins for this site.");
     return;

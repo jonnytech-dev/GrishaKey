@@ -78,7 +78,7 @@
     Object.assign(button.style, {
       width: `${ICON_SIZE}px`, height: `${ICON_SIZE}px`, padding: "0", border: "0",
       borderRadius: "6px", cursor: "pointer",
-      background: "linear-gradient(135deg, #00994C, #00B570 50%, #00B9BE)",
+      display: "flex", alignItems: "center", justifyContent: "center",
     });
     const img = document.createElement("img");
     img.src = chrome.runtime.getURL("icons/icon-32.png");

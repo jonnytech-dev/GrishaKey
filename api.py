@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from core import auth, match, sessions, sharing, storage, vault
+from core import auth, generator, match, sessions, sharing, storage, vault
 
 
 router = APIRouter(prefix="/api/v1")
@@ -100,3 +100,60 @@ def login_password(entry_id: str, response: Response, session=Depends(current_se
         # Same answer for "doesn't exist" and "not yours"
         raise HTTPException(status_code=404, detail="Not found")
     return {"password": entry.password or ""}
+
+
+class NewVaultBody(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class NewLoginBody(BaseModel):
+    vault_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=200)
+    url: str = Field(default="", max_length=2048)
+    username: str = Field(default="", max_length=320)
+    password: str = Field(default="", max_length=1024)
+    notes: str = Field(default="", max_length=10000)
+
+
+@router.get("/vaults")
+def list_vaults(session=Depends(current_session)):
+    # The user's vaults, and whether they can add to each
+    with _db() as db_connection:
+        vaults = sharing.list_vaults(db_connection, session)
+    return [{"id": v.vault_id, "name": v.name, "can_edit": v.can_edit, "is_owner": v.is_owner}
+            for v in vaults]
+
+
+@router.post("/vaults", status_code=201)
+def create_vault(body: NewVaultBody, session=Depends(current_session)):
+    # Same rules as the app: name required, no duplicate names among your own vaults
+    with _db() as db_connection:
+        try:
+            vault_id = sharing.create_vault(db_connection, session, body.name)
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err))
+    return {"id": vault_id, "name": body.name.strip()}
+
+
+@router.post("/logins", status_code=201)
+def create_login(body: NewLoginBody, session=Depends(current_session)):
+    # Same rules as the app: title required, and you must be able to edit the vault
+    with _db() as db_connection:
+        try:
+            entry_id = vault.add_entry(db_connection, session, body.vault_id, body.title.strip(),
+                                       body.url.strip(), body.username.strip(), body.password,
+                                       body.notes)
+        except PermissionError as err:
+            raise HTTPException(status_code=403, detail=str(err) or "You can't add logins to that vault.")
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err))
+    return {"id": entry_id}
+
+
+@router.get("/generate")
+def generate(length: int = 20, session=Depends(current_session)):
+    # A strong password from the same generator the app uses
+    try:
+        return {"password": generator.generate_password(length)}
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))

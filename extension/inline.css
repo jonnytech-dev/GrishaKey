@@ -1,29 +1,39 @@
-/* The dropdown under a login field, in GrishaKey green */
-:root {
+/* The dropdown under a login field. Dark by default; follows the saved theme. */
+:root, :root[data-theme="dark"] {
   --grad: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
-  --ink: #0f172a; --text: #334155; --muted: #64748b; --line: #e2e8f0;
-  --bg: #ffffff; --tint: #e8f8ee; --hover: #f1f5f9; --red: #b91c1c;
+  --bg: #0b1220; --line: #1e293b; --ink: #f1f5f9; --muted: #94a3b8;
+  --tile: #0f2a20; --green: #22c55e; --hover: rgba(0, 181, 112, 0.16); --selected: rgba(0, 181, 112, 0.24); --red: #f87171;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --ink: #f1f5f9; --text: #cbd5e1; --muted: #94a3b8; --line: #1e293b;
-          --bg: #111a2e; --tint: #14302a; --hover: #1e293b; --red: #fca5a5; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #ffffff; --line: #e2e8f0; --ink: #0f172a; --muted: #64748b;
+    --tile: #e8f8ee; --green: #00994C; --hover: #f1f5f9; --selected: #e8f8ee; --red: #b91c1c;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --line: #e2e8f0; --ink: #0f172a; --muted: #64748b;
+  --tile: #e8f8ee; --green: #00994C; --hover: #f1f5f9; --selected: #e8f8ee; --red: #b91c1c;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
-body { font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text);
-       background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 10px; overflow-y: auto; }
-.head { display: flex; align-items: center; justify-content: space-between; }
-.brand { font-weight: 800; font-size: 15px; color: var(--ink); letter-spacing: -0.02em; }
+body {
+  font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px 12px; overflow-y: auto;
+}
+.head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.brand { font-weight: 800; font-size: 18px; color: var(--ink); letter-spacing: -0.03em; }
 .brand span { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.close { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 0 4px; }
-.site { font-size: 11px; color: var(--muted); margin: 4px 0 8px; }
-.item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; border-radius: 10px;
-        background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; }
-.item:hover, .item:focus-visible { background: var(--hover); outline: none; }
-.tile { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
-        background: var(--tint); color: #00994C; font-weight: 800; flex-shrink: 0; }
+.close { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; display: flex; }
+.close:hover { color: var(--ink); background: var(--hover); }
+.site { font-size: 12px; color: var(--muted); margin: 0 2px 8px; }
+.item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px;
+        background: none; text-align: left; cursor: pointer; font: inherit; color: inherit; margin-bottom: 2px; }
+.item:hover { background: var(--hover); }
+.item:focus-visible, .item:first-child:focus { background: var(--selected); outline: none; }
+.tile { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+        background: var(--tile); color: var(--green); font-weight: 800; font-size: 15px; flex-shrink: 0; }
 .info { min-width: 0; }
-.title { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title { font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .msg { color: var(--muted); margin: 6px 2px; }
 .error { color: var(--red); }
