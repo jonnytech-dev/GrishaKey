@@ -154,6 +154,12 @@ def get_profile(db_connection: sqlite3.Connection, user_id: str) -> dict | None:
     return {"username": user["username"], "email": user["email"]}
 
 
+def verify_master_password(db_connection: sqlite3.Connection, user_id: str, password: str) -> bool:
+    # True if this is the user's current master password (used to confirm sensitive actions)
+    user = storage.get_user_by_id(db_connection, user_id)
+    return user is not None and crypto.verify_password(user["password_hash"], password)
+
+
 def update_profile(db_connection: sqlite3.Connection, user_id: str, current_password: str,
                    username: str, email: str) -> None:
     # Change username and/or email. Requires the current master password.

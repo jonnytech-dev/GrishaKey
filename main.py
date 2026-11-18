@@ -9,7 +9,9 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from nicegui import app, run, ui
 
-from core import auth, generator, health, sessions, storage, sharing, vault
+from starlette.formparsers import MultiPartParser
+
+from core import auth, generator, health, sessions, storage, sharing, transfer, vault
 
 
 # ========== Config ==========
@@ -23,6 +25,10 @@ app.add_static_files("/assets", BASE_DIR / "assets")
 DATA_DIR = Path(os.environ.get("GRISHAKEY_DATA", BASE_DIR / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)      # create the folder if it isn't there yet
 DB_PATH = DATA_DIR / "grishakey.db"
+
+# Uploads bigger than this get spooled to a temp file on disk (default 1 MB).
+# Raised just above the CSV import limit so an imported CSV of passwords stays in memory only.
+MultiPartParser.spool_max_size = transfer.MAX_IMPORT_BYTES + 64 * 1024
 
 # Word list for passphrases, loaded once at startup (empty if the file is missing)
 WORDLIST = generator.load_wordlist(BASE_DIR / "core" / "wordlists" / "eff_large_wordlist.txt")
@@ -370,6 +376,35 @@ def do_empty_trash(session):
     db_connection = storage.db_connect(DB_PATH)
     try:
         return vault.empty_trash(db_connection, session)
+    finally:
+        db_connection.close()
+
+
+def do_export_csv(session, password: str, vault_id: str | None) -> str:
+    # Checks the master password, then builds the CSV in memory. vault_id=None → everything.
+    db_connection = storage.db_connect(DB_PATH)
+    try:
+        if not auth.verify_master_password(db_connection, session.user_id, password):
+            raise auth.InvalidCredentialsError("Current password is incorrect")
+        entries = vault.list_entries(db_connection, session)
+        if vault_id:
+            entries = [e for e in entries if e.vault_id == vault_id]
+        names = {v.vault_id: v.name for v in sharing.list_vaults(db_connection, session)}
+        return transfer.entries_to_csv(entries, names)
+    finally:
+        db_connection.close()
+
+
+def do_import_rows(session, vault_id: str, rows: list[dict]) -> int:
+    # Adds each parsed row to the vault. Returns how many were added.
+    db_connection = storage.db_connect(DB_PATH)
+    try:
+        added = 0
+        for row in rows:
+            vault.add_entry(db_connection, session, vault_id, row["title"], row["url"],
+                            row["username"], row["password"], row["notes"])
+            added += 1
+        return added
     finally:
         db_connection.close()
 
@@ -2837,6 +2872,110 @@ def settings_page():
 
             recovery_panel()
 
+            # ===== Import & export =====
+            with ui.element("div").classes("gk-panel w-full p-6 mt-6"):
+                _dialog_header("import_export", "Import & export",
+                               "Move your logins in or out with a CSV file.")
+
+                editable = [(v.vault_id, v.name) for v, _count in vaults if v.can_edit]
+                all_vault_options = {v.vault_id: v.name for v, _count in vaults}
+
+                # --- Export ---
+                ui.label("Export").classes("gk-field-key mt-6")
+                export_scope = ui.select({"__all__": "All passwords", **all_vault_options}, value="__all__",
+                                         label="What to export").props("outlined dense").classes("gk-input w-full mt-2")
+
+                def open_export():
+                    with _dialog() as dialog, ui.card().classes("gk-dialog gap-0"):
+                        _dialog_header("warning_amber", "Export to CSV",
+                                       "The file is NOT encrypted. Anyone who opens it can read every password.",
+                                       tone="red")
+                        ui.label("Import it where you need it, then delete it. Don't open it in Excel, "
+                                 "and don't email it or store it in the cloud.").classes("text-sm text-slate-600 mt-4")
+                        _field_label("Master password")
+                        pw = ui.input(password=True, password_toggle_button=True) \
+                            .props("outlined autofocus").classes("gk-input w-full")
+
+                        async def submit():
+                            scope = None if export_scope.value == "__all__" else export_scope.value
+                            try:
+                                csv_text = await run.io_bound(do_export_csv, session, pw.value or "", scope)
+                            except auth.InvalidCredentialsError:
+                                ui.notify("Incorrect password.", type="negative")
+                                pw.set_value("")
+                                return
+                            dialog.close()
+                            filename = f"grishakey-export-{datetime.now().strftime('%Y-%m-%d')}.csv"
+                            ui.download.content(csv_text, filename)
+                            ui.notify("Export downloaded. Delete the file when you're done with it.", type="positive")
+
+                        pw.on("keydown.enter", submit)
+                        _dialog_footer(dialog, "Download CSV", submit, danger=True)
+                    dialog.open()
+
+                with ui.row().classes("w-full justify-end mt-3"):
+                    ui.button("Export CSV", icon="download", on_click=open_export) \
+                        .props("outline no-caps color=grey-8").classes("rounded-lg px-5 font-semibold")
+
+                # --- Import ---
+                ui.label("Import").classes("gk-field-key mt-8")
+                if not editable:
+                    ui.label("You need a vault you can edit to import into.").classes("text-sm text-slate-500 mt-2")
+                else:
+                    target = ui.select(dict(editable), value=editable[0][0], label="Import into") \
+                        .props("outlined dense").classes("gk-input w-full mt-2")
+                    ui.label("Works with CSV files from GrishaKey, Bitwarden, NordPass, 1Password, Chrome, and Firefox.") \
+                        .classes("text-xs text-slate-500 mt-2")
+
+                    async def handle_upload(e):
+                        # Read the uploaded file into memory only (never saved to disk)
+                        data = await e.file.read()
+                        try:
+                            rows, skipped = transfer.parse_csv(data)
+                        except ValueError as err:
+                            ui.notify(str(err), type="negative")
+                            uploader.reset()
+                            return
+                        uploader.reset()
+                        confirm_import(rows, skipped)
+
+                    def on_rejected():
+                        # The browser refused the file before sending it (over the size limit)
+                        ui.notify("That file is too large. The limit is 2 MB.", type="negative")
+
+                    def confirm_import(rows, skipped):
+                        vault_name = all_vault_options.get(target.value, "this vault")
+                        with _dialog() as dialog, ui.card().classes("gk-dialog gap-0"):
+                            _dialog_header("upload_file", "Import logins",
+                                           f'{len(rows)} login{"" if len(rows) == 1 else "s"} found'
+                                           + (f", {skipped} empty row{'' if skipped == 1 else 's'} skipped" if skipped else "")
+                                           + f'. They\'ll be added to "{vault_name}".')
+                            for row in rows[:5]:
+                                ui.label(f'{row["title"]}  ·  {row["username"] or "no username"}') \
+                                    .classes("text-sm text-slate-700 mt-2 truncate")
+                            if len(rows) > 5:
+                                ui.label(f"…and {len(rows) - 5} more").classes("text-sm text-slate-500 mt-1")
+                            ui.label("After importing, delete the CSV file from your computer.") \
+                                .classes("text-sm text-slate-500 mt-4")
+
+                            async def submit():
+                                try:
+                                    added = await run.io_bound(do_import_rows, session, target.value, rows)
+                                except (ValueError, PermissionError) as err:
+                                    ui.notify(str(err), type="negative")
+                                    return
+                                dialog.close()
+                                app.storage.user["flash"] = f'Imported {added} login{"" if added == 1 else "s"} into "{vault_name}"'
+                                ui.navigate.to(f"/vault/{target.value}")
+
+                            _dialog_footer(dialog, "Import", submit)
+                        dialog.open()
+
+                    uploader = ui.upload(on_upload=handle_upload, on_rejected=on_rejected, auto_upload=True,
+                                         max_files=1, max_file_size=transfer.MAX_IMPORT_BYTES,
+                                         label="Choose a CSV file") \
+                        .props('accept=".csv,text/csv" flat bordered').classes("w-full mt-3")
+
             # ===== Appearance =====
             with ui.element("div").classes("gk-panel w-full p-6 mt-6"):
                 _dialog_header('palette', 'Appearance', 'Choose how the app looks.')
@@ -2996,6 +3135,9 @@ def help_page():
                      "To the Trash. The vault owner can restore it until the Trash is emptied."),
                     ("How do I change my email, username, or password?",
                      "Go to Settings. Changing your email or username asks for your master password first."),
+                    ("How do I move my passwords in or out?",
+                     "Go to Settings, then Import & export. Export makes a CSV file (not encrypted, so delete it "
+                     "after use). Import accepts CSV files from most password managers."),
                 ]:
                     with ui.expansion(question).classes("w-full gk-faq"):
                         ui.label(answer).classes("text-slate-700")

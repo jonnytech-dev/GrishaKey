@@ -567,3 +567,11 @@ class Test_Update_Profile:
         with pytest.raises(ValueError):
             auth.update_profile(db_connection, user_id, PASSWORD, "   ", "jon@gmail.com")
         db_connection.close()
+
+class Test_Verify_Master_Password:
+    def test_verify(self, tmp_path):
+        db_connection = setup_db(tmp_path)
+        user_id = auth.register(db_connection, "jon", "jon@gmail.com", PASSWORD)
+        assert auth.verify_master_password(db_connection, user_id, PASSWORD) is True
+        assert auth.verify_master_password(db_connection, user_id, "wr0ng!password") is False
+        db_connection.close()
