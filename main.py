@@ -11,6 +11,7 @@ from nicegui import app, run, ui
 
 from starlette.formparsers import MultiPartParser
 
+import api
 from core import auth, generator, health, sessions, storage, sharing, transfer, vault
 
 
@@ -93,6 +94,10 @@ def setup_database() -> None:
         db_connection.close()     # always close, even if create_tables fails
 
 setup_database()
+
+# JSON API for the browser extension (/api/v1)
+api.setup(DB_PATH)
+app.include_router(api.router)
 
 def _brand(size_classes: str):
     # The app name: plain part, then the accent part in the gradient. Either can be empty.

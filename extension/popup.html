@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="popup">
+    <div class="top">
+      <div class="brand">Grisha<span>Key</span></div>
+      <button class="link hidden" id="logout">Sign out</button>
+    </div>
+
+    <!-- Shown until a server is set in Settings -->
+    <section id="setup" class="hidden">
+      <p class="msg">Connect the extension to your GrishaKey server first.</p>
+      <button class="primary" id="open-settings">Open settings</button>
+    </section>
+
+    <!-- Sign in -->
+    <form id="login" class="hidden">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Master password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Sign in</button>
+      <p class="msg error hidden" id="login-error"></p>
+    </form>
+
+    <!-- Logins for this site -->
+    <section id="list" class="hidden">
+      <div class="site" id="site"></div>
+      <div id="items"></div>
+      <p class="msg hidden" id="status"></p>
+    </section>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
