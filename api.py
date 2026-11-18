@@ -59,7 +59,11 @@ def login(body: LoginBody, request: Request):
         except auth.InvalidCredentialsError:
             raise HTTPException(status_code=401, detail="Incorrect email or password")
         except auth.AccountLockedError:
-            raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+            raise HTTPException(
+                status_code=429,
+                detail="Too many sign-in attempts. Wait 15 minutes and try again.",
+                headers={"Retry-After": "900"},
+            )
     return {"token": sessions.create(session), "expires_in": sessions.TIMEOUT_SECONDS}
 
 

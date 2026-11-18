@@ -58,6 +58,15 @@ class Test_Login:
         client.post("/api/v1/logout", headers=bearer(token))
         assert client.get("/api/v1/logins", params={"url": "https://github.com"}, headers=bearer(token)).status_code == 401
 
+    def test_lockout_says_so(self, setup):
+        client, _ = setup
+        for _ in range(auth.MAX_FAILED_LOGIN_ATTEMPTS):
+            sign_in(client, password="wr0ng!password")
+        response = sign_in(client)       # correct password, but locked out
+        assert response.status_code == 429
+        assert "Too many" in response.json()["detail"]
+        assert response.headers["retry-after"] == "900"
+
 
 class Test_Auth_Required:
     def test_no_token(self, setup):

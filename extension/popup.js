@@ -21,7 +21,12 @@ async function api(path, options = {}) {
   const token = await getToken();
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${server}/api/v1${path}`, { ...options, headers });
+  let response;
+  try {
+    response = await fetch(`${server}/api/v1${path}`, { ...options, headers });
+  } catch {
+    throw new Error("Can't reach your GrishaKey server. Check the address in Settings.");
+  }
   if (response.status === 401) {
     await chrome.storage.session.remove("token");
     throw new Error("signed-out");
