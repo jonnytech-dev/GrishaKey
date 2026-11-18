@@ -9,7 +9,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from nicegui import app, run, ui
 
-from core import auth, generator, sessions, storage, sharing, vault
+from core import auth, generator, health, sessions, storage, sharing, vault
 
 
 # ========== Config ==========
@@ -184,6 +184,19 @@ def load_passwords_data(session):
         entries = vault.list_entries(db_connection, session)
         direct_owners = sharing.direct_share_owner_names(db_connection, session)
         return [(v, counts.get(v.vault_id, 0)) for v in vaults], entries, direct_owners
+    finally:
+        db_connection.close()
+
+
+def load_dashboard_data(session):
+    # Everything the Dashboard needs, from ONE connection.
+    # Entries are decrypted here for the health check, then dropped when the page is built.
+    db_connection = storage.db_connect(DB_PATH)
+    try:
+        vaults = sharing.list_vaults(db_connection, session)
+        entries = vault.list_entries(db_connection, session)
+        trash_count = storage.count_trashed_entries(db_connection, session.user_id)
+        return vaults, entries, trash_count
     finally:
         db_connection.close()
 
@@ -507,9 +520,6 @@ def _apply_theme():
                 background: url('/assets/login_background_light.png') center / cover no-repeat fixed;
             }
 
-            /* The sidebar row pinned at the bottom (Password Generator) */
-            .gk-nav-pinned { background: rgba(255, 255, 255, 0.7); }
-
             /* Small screens: stack everything in the middle instead */
             @media (max-width: 900px) {
                 .gk-login-form {
@@ -525,6 +535,8 @@ def _apply_theme():
             /* ===== Full-screen layout ===== */
             .gk-shell { width: 100%; height: 100vh; }
             .gk-main  { height: 100vh; overflow-y: auto; }
+            /* Keep page sections at full height so the main area scrolls instead of squashing them */
+            .gk-main > * { flex-shrink: 0; }
 
             /* Glass sidebar: see-through white + blur of whatever is behind it */
             .gk-sidebar {
@@ -747,6 +759,70 @@ def _apply_theme():
                 white-space: nowrap;
             }
 
+            /* ===== Dashboard ===== */
+            .gk-dash-hero { position: relative; overflow: hidden; border-radius: 24px; padding: 28px 28px 32px; }
+            .gk-dash-hero svg.wave { position: absolute; right: -40px; top: -20px; width: 60%; max-width: 520px; opacity: 0.55; pointer-events: none; }
+            .gk-stat {
+                --tone-bg: #dcfce7; --tone-fg: #00994C; --tone-soft: rgba(240, 253, 244, 0.9);
+                --tone-border: #86efac; --tone-glow: rgba(0, 153, 76, 0.35);
+                background: linear-gradient(135deg, var(--tone-soft), rgba(255, 255, 255, 0.75));
+                border: 1px solid #e2e8f0; border-radius: 18px;
+                padding: 18px; cursor: pointer;
+            }
+            .gk-stat:hover { border-color: var(--tone-border); box-shadow: 0 10px 30px -15px var(--tone-glow); }
+            .gk-stat-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center;
+                            justify-content: center; background: var(--tone-bg); color: var(--tone-fg); flex-shrink: 0; }
+            /* Soft color families for cards and letter tiles (same light tone as the green) */
+            .gk-tone-green  { --tone-bg: #dcfce7; --tone-fg: #00994C; --tone-soft: rgba(240, 253, 244, 0.9);
+                              --tone-border: #86efac; --tone-glow: rgba(0, 153, 76, 0.35); }
+            .gk-tone-blue   { --tone-bg: #dbeafe; --tone-fg: #2563eb; --tone-soft: rgba(239, 246, 255, 0.9);
+                              --tone-border: #93c5fd; --tone-glow: rgba(37, 99, 235, 0.3); }
+            .gk-tone-violet { --tone-bg: #ede9fe; --tone-fg: #7c3aed; --tone-soft: rgba(245, 243, 255, 0.9);
+                              --tone-border: #c4b5fd; --tone-glow: rgba(124, 58, 237, 0.3); }
+            .gk-tone-amber  { --tone-bg: #fef3c7; --tone-fg: #d97706; --tone-soft: rgba(255, 251, 235, 0.9);
+                              --tone-border: #fcd34d; --tone-glow: rgba(217, 119, 6, 0.3); }
+            .gk-tone-rose   { --tone-bg: #ffe4e6; --tone-fg: #e11d48; --tone-soft: rgba(255, 241, 242, 0.9);
+                              --tone-border: #fda4af; --tone-glow: rgba(225, 29, 72, 0.3); }
+            .gk-tone-teal   { --tone-bg: #ccfbf1; --tone-fg: #0d9488; --tone-soft: rgba(240, 253, 250, 0.9);
+                              --tone-border: #5eead4; --tone-glow: rgba(13, 148, 136, 0.3); }
+            .gk-tile { background: var(--tone-bg); color: var(--tone-fg); }
+            .gk-safety-bar { height: 10px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+            .gk-safety-bar > div { height: 100%; border-radius: 999px; background: #ef4444; }
+            .gk-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+                        padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+            .gk-badge-red { background: #fee2e2; color: #b91c1c; }
+            .gk-badge-amber { background: #fef3c7; color: #b45309; }
+            /* Password rows with a health problem: colored edge and a faint tint */
+            .gk-row-red { border-left: 4px solid #ef4444 !important; background: linear-gradient(90deg, rgba(254, 226, 226, 0.7), rgba(255, 255, 255, 0.75)) !important; }
+            .gk-row-amber { border-left: 4px solid #f59e0b !important; background: linear-gradient(90deg, rgba(254, 243, 199, 0.7), rgba(255, 255, 255, 0.75)) !important; }
+            .gk-issue-row { padding: 12px 4px; border-top: 1px solid #f1f5f9; cursor: pointer; }
+            .gk-issue-row:hover { background: rgba(248, 250, 252, 0.8); }
+
+            /* ===== Mobile layout ===== */
+            .gk-mobile-only { display: none; }
+            .gk-bottom-nav {
+                position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+                display: none; justify-content: space-around; align-items: center;
+                padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+                background: rgba(255, 255, 255, 0.92);
+                backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+                border-top: 1px solid #e2e8f0;
+            }
+            .gk-tab { display: flex; flex-direction: column; align-items: center; gap: 2px;
+                      font-size: 11px; font-weight: 600; color: #475569;
+                      padding: 6px 10px; border-radius: 14px; cursor: pointer; min-width: 56px; }
+            .gk-tab-active { background: #dcfce7; color: #15803d; }
+            @media (max-width: 767px) {
+                .gk-sidebar { display: none !important; }
+                .gk-mobile-only { display: flex; }
+                .gk-bottom-nav { display: flex; }
+                .gk-main { height: 100dvh; padding: 16px 16px 104px !important; }
+                .gk-dash-hero { padding: 20px 20px 24px; }
+                .gk-dash-hero .text-4xl { font-size: 2rem; line-height: 2.5rem; }
+                .gk-issue-chevron { display: none; }
+                .gk-badge { font-size: 12px; padding: 4px 9px; gap: 4px; }
+            }
+
             /* ===== Dark theme (Quasar adds body--dark when dark mode is on) ===== */
             body.body--dark {
                 background:
@@ -789,7 +865,6 @@ def _apply_theme():
                 background: url('/assets/login_background_dark.png') center / cover no-repeat fixed;
             }
             .body--dark .gk-login-input .q-field__control { background: rgba(15, 23, 42, 0.85); }
-            .body--dark .gk-nav-pinned { background: rgba(30, 41, 59, 0.6); }
 
             .body--dark .gk-vault-card,
             .body--dark .gk-panel { background: rgba(15, 23, 42, 0.7); border-color: #1e293b; }
@@ -803,6 +878,24 @@ def _apply_theme():
             .body--dark .gk-kbd { background: #0f172a; border-color: #334155; color: #cbd5e1; }
             .body--dark .gk-pill { background: #1e293b; color: #cbd5e1; }
             .body--dark .gk-pill-green { background: rgba(22, 163, 74, 0.2); color: #4ade80; }
+            .body--dark .gk-stat { background: linear-gradient(135deg, var(--tone-soft), rgba(15, 23, 42, 0.7)); border-color: #1e293b; }
+            .body--dark .gk-stat,
+            .body--dark .gk-tone-green  { --tone-bg: rgba(22, 163, 74, 0.18); --tone-fg: #4ade80; --tone-soft: rgba(22, 163, 74, 0.08); }
+            .body--dark .gk-tone-blue   { --tone-bg: rgba(59, 130, 246, 0.18); --tone-fg: #93c5fd; --tone-soft: rgba(59, 130, 246, 0.08); }
+            .body--dark .gk-tone-violet { --tone-bg: rgba(139, 92, 246, 0.18); --tone-fg: #c4b5fd; --tone-soft: rgba(139, 92, 246, 0.08); }
+            .body--dark .gk-tone-amber  { --tone-bg: rgba(245, 158, 11, 0.18); --tone-fg: #fcd34d; --tone-soft: rgba(245, 158, 11, 0.08); }
+            .body--dark .gk-tone-rose   { --tone-bg: rgba(244, 63, 94, 0.18); --tone-fg: #fda4af; --tone-soft: rgba(244, 63, 94, 0.08); }
+            .body--dark .gk-tone-teal   { --tone-bg: rgba(20, 184, 166, 0.18); --tone-fg: #5eead4; --tone-soft: rgba(20, 184, 166, 0.08); }
+            .body--dark .gk-safety-bar { background: #1e293b; }
+            .body--dark .gk-badge-red { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+            .body--dark .gk-badge-amber { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
+            .body--dark .gk-row-red { background: linear-gradient(90deg, rgba(239, 68, 68, 0.14), rgba(15, 23, 42, 0.7)) !important; }
+            .body--dark .gk-row-amber { background: linear-gradient(90deg, rgba(245, 158, 11, 0.14), rgba(15, 23, 42, 0.7)) !important; }
+            .body--dark .gk-issue-row { border-top-color: #1e293b; }
+            .body--dark .gk-issue-row:hover { background: rgba(30, 41, 59, 0.6); }
+            .body--dark .gk-bottom-nav { background: rgba(15, 23, 42, 0.92); border-top-color: #1e293b; }
+            .body--dark .gk-tab { color: #94a3b8; }
+            .body--dark .gk-tab-active { background: rgba(22, 163, 74, 0.18); color: #4ade80; }
 
             /* Text colors written for light mode, flipped for dark */
             .body--dark .text-slate-900 { color: #f1f5f9 !important; }
@@ -887,6 +980,12 @@ def _app_shell(vaults, on_create_vault, on_search=None, search_placeholder="Sear
 
             ui.element("div").classes("w-full h-px bg-slate-200 my-3")
 
+            # Dashboard: the overview page
+            dash_classes = "gk-nav-item w-full no-wrap" + (" gk-nav-active" if active == "dashboard" else "")
+            with ui.row().classes(dash_classes).on("click", lambda: ui.navigate.to("/")):
+                ui.icon("o_dashboard").classes("text-xl")
+                ui.label("Dashboard")
+
             # Vaults row: click to fold the whole vault section (remembered between pages)
             vaults_open = _sidebar_is_open("vaults")
 
@@ -934,7 +1033,7 @@ def _app_shell(vaults, on_create_vault, on_search=None, search_placeholder="Sear
                     all_classes = "gk-sub-item w-full no-wrap" + (
                         " gk-nav-active" if active == "vaults" and active_vault_id is None else ""
                     )
-                    with ui.row().classes(all_classes).on("click", lambda: ui.navigate.to("/")):
+                    with ui.row().classes(all_classes).on("click", lambda: ui.navigate.to("/vaults")):
                         ui.icon("o_grid_view").classes("text-lg")
                         ui.label("All vaults")
 
@@ -978,7 +1077,7 @@ def _app_shell(vaults, on_create_vault, on_search=None, search_placeholder="Sear
             ui.space()     # pushes Settings to the bottom
 
             # Password Generator: pinned to the bottom of the sidebar
-            generator_classes = "gk-nav-item w-full no-wrap gk-nav-pinned" + (
+            generator_classes = "gk-nav-item w-full no-wrap" + (
                 " gk-nav-active" if active == "generator" else ""
             )
             with ui.row().classes(generator_classes).on("click", lambda: ui.navigate.to("/generator")):
@@ -989,6 +1088,10 @@ def _app_shell(vaults, on_create_vault, on_search=None, search_placeholder="Sear
 
         # ===== Main area (scrolls on its own) =====
         with ui.column().classes("gk-main flex-1 min-w-0 p-6 md:p-10 gap-0") as main_area:
+
+            # Phone-only header: the app name, centered
+            with ui.row().classes("gk-mobile-only w-full justify-center mb-4"):
+                _brand("text-2xl")
 
             # Search across the top (left out on pages that don't need it, like Settings)
             if show_search:
@@ -1001,7 +1104,40 @@ def _app_shell(vaults, on_create_vault, on_search=None, search_placeholder="Sear
                 with search.add_slot("append"):
                     ui.label("Ctrl + K").classes("gk-kbd")
 
+    # ===== Phone-only bottom tab bar =====
+    with ui.dialog().props("position=bottom") as more_sheet, ui.card().classes("w-full gap-0 p-4").style("border-radius: 20px 20px 0 0"):
+        for icon, label, action in [
+            ("add", "Create Vault", lambda: (more_sheet.close(), on_create_vault())),
+            ("password", "Password Generator", lambda: ui.navigate.to("/generator")),
+            ("settings", "Settings", lambda: ui.navigate.to("/settings")),
+            ("help_outline", "Help", lambda: ui.navigate.to("/help")),
+        ]:
+            with ui.row().classes("gk-nav-item w-full no-wrap").on("click", action):
+                ui.icon(icon).classes("text-xl")
+                ui.label(label)
+        _credit_links("w-full pt-4")
+
+    tab_items = [
+        ("dashboard", "o_dashboard", "Dashboard", lambda: ui.navigate.to("/")),
+        ("vaults", "o_lock", "Vaults", lambda: ui.navigate.to("/vaults")),
+        ("passwords", "key", "Passwords", lambda: ui.navigate.to("/passwords")),
+        ("trash", "delete_outline", "Trash", lambda: ui.navigate.to("/trash")),
+        ("more", "more_horiz", "More", more_sheet.open),
+    ]
+    with ui.element("nav").classes("gk-bottom-nav"):
+        for key, icon, label, action in tab_items:
+            is_active = key == active or (key == "more" and active in ("generator", "settings", "help"))
+            with ui.element("div").classes("gk-tab" + (" gk-tab-active" if is_active else "")).on("click", action):
+                ui.icon(icon).classes("text-2xl")
+                ui.label(label)
+
     return main_area
+
+
+def _mobile_credit():
+    # Phone-only credit at the end of a page (the sidebar that shows it is hidden on phones)
+    with ui.element("div").classes("gk-mobile-only w-full justify-center mt-10"):
+        _credit_links()
 
 
 # ========== Dialog building blocks ==========
@@ -1351,7 +1487,7 @@ def _create_vault_dialog(session):
                 ui.notify(str(e), type="negative")
                 return
             app.storage.user["flash"] = f'Created "{name.value.strip()}"'
-            ui.navigate.to("/")
+            ui.navigate.to("/vaults")
 
         name.on("keydown.enter", submit)
         _dialog_footer(dialog, "Create", submit)
@@ -1441,7 +1577,7 @@ def _open_rename_dialog(session, v):
                 ui.notify(str(e), type="negative")
                 return
             app.storage.user["flash"] = f'Renamed to "{name.value.strip()}"'
-            ui.navigate.to("/")
+            ui.navigate.to("/vaults")
 
         name.on("keydown.enter", submit)
         _dialog_footer(dialog, "Save", submit)
@@ -1475,9 +1611,29 @@ def _vault_card(session, v, count):
                         ui.menu_item("Share", on_click=lambda v=v: _open_manage_vault_sharing(session, v.vault_id, v.name))
 
 
-def _entry_row(session, vault_id, e, can_share: bool, source: str | None = None, return_to: str | None = None):
-    # One entry in a vault: letter tile, title, username, quick-copy buttons
-    with ui.element("div").classes("gk-vault-card p-4 cursor-pointer w-full") \
+# Password health labels: (badge text, badge color class, icon, row highlight class)
+# Red = reused, yellow = too weak / not strong enough
+ISSUE_LABELS = {
+    "reused": ("Reused Password", "gk-badge-red", "error_outline", "gk-row-red"),
+    "weak": ("Weak Password", "gk-badge-amber", "warning_amber", "gk-row-amber"),
+    "fair": ("Not Strong Enough", "gk-badge-amber", "warning_amber", "gk-row-amber"),
+}
+
+
+def _issue_badge(issue: str):
+    # Small colored pill naming what's wrong with a password
+    text, badge_class, badge_icon, _row_class = ISSUE_LABELS[issue]
+    with ui.element("span").classes(f"gk-badge {badge_class}"):
+        ui.icon(badge_icon).classes("text-base")
+        ui.label(text)
+
+
+def _entry_row(session, vault_id, e, can_share: bool, source: str | None = None, return_to: str | None = None,
+               issue: str | None = None, issue_detail: str | None = None):
+    # One entry in a vault: letter tile, title, username, quick-copy buttons.
+    # With an issue ("reused", "weak", "fair"), the row is highlighted and says what's wrong.
+    row_class = f" {ISSUE_LABELS[issue][3]}" if issue else ""
+    with ui.element("div").classes("gk-vault-card p-4 cursor-pointer w-full" + row_class) \
             .on("click", lambda eid=e.vault_entry_id: ui.navigate.to(f"/vault/{vault_id}/entry/{eid}")):
         with ui.row().classes("w-full items-center no-wrap gap-4"):
             with ui.element("div").classes("rounded-xl bg-green-50 flex items-center justify-center") \
@@ -1489,6 +1645,12 @@ def _entry_row(session, vault_id, e, can_share: bool, source: str | None = None,
                 ui.label(e.username or e.url or "No username").classes("text-sm text-slate-500 truncate")
                 if source:
                     ui.label(source).classes("text-xs text-slate-400 truncate")
+                # What's wrong with the password, and why
+                if issue:
+                    with ui.row().classes("items-center gap-2 mt-2"):
+                        _issue_badge(issue)
+                        if issue_detail:
+                            ui.label(issue_detail).classes("text-xs text-slate-500")
 
             # Quick copy without opening the entry (.stop keeps the click off the row)
             with ui.row().classes("gap-1 no-wrap"):
@@ -1610,7 +1772,114 @@ def _scroll_to(section_id: str):
 # ========== Pages ==========
 
 @ui.page("/")
-def index():
+def dashboard_page():
+    # Protected page: no valid session → back to login
+    session = current_session()
+    if session is None:
+        return RedirectResponse("/login")
+
+    _apply_theme()
+    _apply_user_theme()
+    show_flash()
+
+    vault_infos, entries, trash_count = load_dashboard_data(session)
+    report = health.analyze(entries)
+    vaults = [(v, 0) for v in vault_infos]      # the sidebar only needs names
+    vault_dialog = _create_vault_dialog(session)
+    main_area = _app_shell(vaults, vault_dialog.open, active="dashboard", show_search=False)
+
+    # Letter tiles cycle through soft colors, picked from the title so each site keeps its color
+    tile_tones = ["green", "blue", "violet", "amber", "rose", "teal"]
+
+    def stat_card(icon, title, subtitle, target, tone):
+        with ui.element("div").classes(f"gk-stat gk-tone-{tone}").on("click", lambda: ui.navigate.to(target)):
+            with ui.row().classes("w-full items-center no-wrap gap-4"):
+                with ui.element("div").classes("gk-stat-icon"):
+                    ui.icon(icon).classes("text-2xl")
+                with ui.column().classes("gap-0 flex-1 min-w-0"):
+                    ui.label(title).classes("text-lg font-bold text-slate-900")
+                    ui.label(subtitle).classes("text-sm text-slate-500")
+                ui.icon("chevron_right").classes("text-xl text-slate-400")
+
+    with main_area:
+        # ===== Header with a soft green wave =====
+        with ui.element("div").classes("gk-dash-hero mt-2"):
+            ui.html("""<svg class="wave" viewBox="0 0 400 200" aria-hidden="true">
+                <defs><linearGradient id="dw" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#00994C" stop-opacity="0"/>
+                <stop offset="1" stop-color="#00B570" stop-opacity="0.9"/></linearGradient></defs>
+                <path d="M0 170 C 120 170, 160 90, 260 90 S 360 40, 400 20" fill="none" stroke="url(#dw)" stroke-width="3"/>
+                </svg>""", sanitize=False)
+            ui.label("Dashboard").classes("text-4xl font-extrabold tracking-tight text-slate-900")
+            ui.label("Your security overview at a glance.").classes("text-slate-500 mt-1")
+
+        # ===== Cards: 2 columns on phones and up =====
+        with ui.element("div").classes("grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mt-4"):
+            count_v = len(vault_infos)
+            count_p = report["total"]
+            stat_card("o_lock", "Vaults", f"{count_v} vault" if count_v == 1 else f"{count_v} vaults", "/vaults", "blue")
+            stat_card("key", "Passwords", f"{count_p} password" if count_p == 1 else f"{count_p} passwords", "/passwords", "violet")
+
+            # Password Safety: red share of the bar = insecure
+            with ui.element("div").classes("gk-stat gk-tone-green").on("click", lambda: ui.navigate.to("/passwords?filter=issues")):
+                with ui.row().classes("w-full items-center no-wrap gap-4"):
+                    with ui.element("div").classes("gk-stat-icon"):
+                        ui.icon("o_shield").classes("text-2xl")
+                    ui.label("Password Safety").classes("text-lg font-bold text-slate-900 flex-1")
+                    ui.icon("chevron_right").classes("text-xl text-slate-400")
+                share = (report["insecure"] / report["total"] * 100) if report["total"] else 0
+                with ui.element("div").classes("gk-safety-bar w-full mt-4"):
+                    ui.element("div").style(f"width: {share:.0f}%")
+                with ui.row().classes("w-full justify-between mt-2"):
+                    ui.label(f'{report["insecure"]} insecure').classes("text-sm font-semibold").style("color: #ef4444")
+                    ui.label(f'{report["strong"]} strong').classes("text-sm font-semibold").style("color: #16a34a")
+
+            # Trash: count, or "Clean" when empty
+            with ui.element("div").classes("gk-stat gk-tone-amber").on("click", lambda: ui.navigate.to("/trash")):
+                with ui.row().classes("w-full items-center no-wrap gap-4"):
+                    with ui.element("div").classes("gk-stat-icon"):
+                        ui.icon("delete_outline").classes("text-2xl")
+                    ui.label("Trash").classes("text-lg font-bold text-slate-900 flex-1")
+                    ui.icon("chevron_right").classes("text-xl text-slate-400")
+                with ui.row().classes("items-center gap-2 mt-4"):
+                    if trash_count == 0:
+                        ui.icon("check_circle").classes("text-xl").style("color: #16a34a")
+                        ui.label("Clean").classes("text-slate-600 font-medium")
+                    else:
+                        ui.label(f"{trash_count} item" if trash_count == 1 else f"{trash_count} items") \
+                            .classes("text-slate-600 font-medium")
+
+        # ===== Password Issues =====
+        with ui.element("div").classes("gk-panel w-full p-5 mt-4"):
+            with ui.row().classes("w-full items-center justify-between no-wrap mb-2"):
+                ui.label("Password Issues").classes("text-xl font-bold text-slate-900")
+                if report["issues"]:
+                    ui.link("View All", "/passwords?filter=issues").classes("font-semibold no-underline").style("color: #16a34a")
+
+            if not report["issues"]:
+                with ui.row().classes("items-center gap-2 py-3"):
+                    ui.icon("verified").classes("text-xl").style("color: #16a34a")
+                    ui.label("No issues found. Every password is strong and unique.").classes("text-slate-600")
+            else:
+                for item in report["issues"][:5]:
+                    e = item.entry
+                    with ui.row().classes("gk-issue-row w-full items-center no-wrap gap-3") \
+                            .on("click", lambda e=e: ui.navigate.to(f"/vault/{e.vault_id}/entry/{e.vault_entry_id}")):
+                        tone = tile_tones[sum(map(ord, e.title.lower())) % len(tile_tones)]
+                        with ui.element("div").classes(f"gk-tile gk-tone-{tone} rounded-xl flex items-center justify-center shrink-0") \
+                                .style("width: 44px; height: 44px"):
+                            ui.label((e.title[:1] or "?").upper()).classes("text-lg font-extrabold")
+                        with ui.column().classes("gap-0 flex-1 min-w-0"):
+                            ui.label(e.title).classes("font-semibold text-slate-900 truncate")
+                            ui.label(e.username or e.url or "").classes("text-sm text-slate-500 truncate")
+                        _issue_badge(item.issue)
+                        ui.icon("chevron_right").classes("gk-issue-chevron text-xl text-slate-400")
+
+        _mobile_credit()
+
+
+@ui.page("/vaults")
+def vaults_page():
     # Protected page: no valid session → back to login
     session = current_session()
     if session is None:
@@ -1652,6 +1921,8 @@ def index():
                 .props("unelevated no-caps").classes("rounded-xl px-5 font-semibold gradient-bg")
 
         vault_grid()
+
+        _mobile_credit()
 
 
 @ui.page("/login")
@@ -1952,6 +2223,8 @@ def vault_detail_page(vault_id: str):
 
         entry_list()
 
+        _mobile_credit()
+
 
 @ui.page("/vault/{vault_id}/entry/{entry_id}")
 def entry_detail_page(vault_id: str, entry_id: str):
@@ -1982,7 +2255,7 @@ def entry_detail_page(vault_id: str, entry_id: str):
 
         # ===== Breadcrumb: Vaults › Work › Gmail =====
         with ui.row().classes("items-center gap-1 mt-8 text-sm no-wrap"):
-            ui.link("Vaults", "/").classes("text-slate-500 no-underline hover:text-slate-900")
+            ui.link("Vaults", "/vaults").classes("text-slate-500 no-underline hover:text-slate-900")
             ui.icon("chevron_right").classes("text-slate-400")
             if current:
                 ui.link(current.name, f"/vault/{vault_id}").classes("text-slate-500 no-underline hover:text-slate-900")
@@ -2032,9 +2305,11 @@ def entry_detail_page(vault_id: str, entry_id: str):
             with ui.element("div").classes("gk-panel w-full p-5"):
                 ui.label(entry.notes).classes("text-slate-700 whitespace-pre-wrap")
 
+        _mobile_credit()
+
 
 @ui.page("/passwords")
-def passwords_page():
+def passwords_page(filter: str = "all"):
     # Protected page: no valid session → back to login
     session = current_session()
     if session is None:
@@ -2048,7 +2323,28 @@ def passwords_page():
     vaults, entries, direct_owners = load_passwords_data(session)
     vault_by_id = {v.vault_id: v for v, _count in vaults}
     owned_ids = {v.vault_id for v, _count in vaults if v.is_owner}
-    state = {"search": "", "filter": "all", "sort": "asc"}
+    state = {"search": "", "filter": filter if filter in ("all", "shared", "issues") else "all", "sort": "asc"}
+
+    # Password health, worked out once in memory: what's wrong with each entry, and why
+    issue_by_id = {i.entry.vault_entry_id: i.issue for i in health.analyze(entries)["issues"]}
+    titles_by_password: dict[str, list[str]] = {}
+    for e in entries:
+        if e.password:
+            titles_by_password.setdefault(e.password, []).append(e.title)
+
+    def issue_detail(e) -> str:
+        # One short sentence telling the user what to fix
+        issue = issue_by_id.get(e.vault_entry_id)
+        if issue == "reused":
+            others = list(titles_by_password[e.password])
+            others.remove(e.title)
+            names = ", ".join(others[:3]) + (f" and {len(others) - 3} more" if len(others) > 3 else "")
+            return f"Same password as {names}. Use a different one for each site."
+        if issue == "weak":
+            return "Too short or too common. It would be easy to guess."
+        if issue == "fair":
+            return "Could be guessed with time. Make it longer or add symbols."
+        return ""
 
     def source_label(e) -> str:
         # Where this entry comes from, so nobody wonders why it's in the list
@@ -2066,6 +2362,10 @@ def passwords_page():
         # [All | Shared with me]: shared = anything NOT in a vault you own
         if state["filter"] == "shared":
             shown = [e for e in shown if e.vault_id not in owned_ids]
+
+        # Needs attention: weak, reused, or not strong enough
+        if state["filter"] == "issues":
+            shown = [e for e in shown if e.vault_entry_id in issue_by_id]
 
         # Search title, username, and website
         term = state["search"].lower()
@@ -2090,7 +2390,9 @@ def passwords_page():
 
         with ui.column().classes("w-full gap-3 mt-4"):
             for e in shown:
-                _entry_row(session, e.vault_id, e, e.vault_id in owned_ids, source=source_label(e), return_to="/passwords")
+                _entry_row(session, e.vault_id, e, e.vault_id in owned_ids, source=source_label(e),
+                           return_to=f"/passwords?filter={state['filter']}",
+                           issue=issue_by_id.get(e.vault_entry_id), issue_detail=issue_detail(e))
 
     def on_search(text):
         state["search"] = text
@@ -2115,12 +2417,15 @@ def passwords_page():
 
         # Filter on the left, sort on the right
         with ui.row().classes("w-full items-center justify-between no-wrap mt-6 gap-4"):
-            ui.toggle({"all": "All", "shared": "Shared with me"}, value="all", on_change=on_filter) \
+            ui.toggle({"all": "All", "shared": "Shared with me", "issues": "Needs attention"},
+                      value=state["filter"], on_change=on_filter) \
                 .props("no-caps unelevated rounded toggle-color=green-7")
             ui.select({"asc": "A → Z", "desc": "Z → A"}, value="asc", label="Sort", on_change=on_sort) \
                 .props("outlined dense").classes("gk-input").style("width: 140px")
 
         password_list()
+
+        _mobile_credit()
 
 
 @ui.page("/trash")
@@ -2218,6 +2523,8 @@ def trash_page():
 
     with main_area:
         trash_list()
+
+        _mobile_credit()
 
 
 @ui.page("/generator")
@@ -2343,6 +2650,8 @@ def generator_page():
                     ui.switch("Add a number", value=True,
                               on_change=lambda e: set_option("number", e.value)).props("color=green-7")
             passphrase_options.set_visibility(False)
+
+        _mobile_credit()
 
     regenerate()
 
@@ -2548,6 +2857,8 @@ def settings_page():
                     ui.button("Log out", on_click=logout) \
                         .props("outline no-caps color=negative").classes("rounded-lg px-5 font-semibold")
 
+        _mobile_credit()
+
 
 @ui.page("/help")
 def help_page():
@@ -2688,6 +2999,8 @@ def help_page():
                 ]:
                     with ui.expansion(question).classes("w-full gk-faq"):
                         ui.label(answer).classes("text-slate-700")
+
+        _mobile_credit()
 
 
 # ========== Run ==========

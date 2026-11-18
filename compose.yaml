@@ -1,0 +1,27 @@
+services:
+  grishakey:
+    build: .
+    image: grishakey:latest
+    container_name: grishakey
+    restart: unless-stopped
+
+    # Secrets and settings come from .env (never baked into the image)
+    env_file: .env
+
+    # Only this computer can reach it. A reverse proxy (Caddy, Nginx, Traefik) adds HTTPS in front.
+    # To allow other devices on your network, change to "9500:9500" (use HTTPS if you do).
+    ports:
+      - "127.0.0.1:9500:9500"
+
+    # Database and NiceGUI storage live here and survive rebuilds and updates
+    volumes:
+      - grishakey-data:/data
+
+    # Extra hardening: no privilege escalation, no special Linux capabilities
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  grishakey-data:

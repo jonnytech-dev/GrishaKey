@@ -354,6 +354,15 @@ def get_trashed_entry(db_connection: sqlite3.Connection, user_id: str, vault_ent
           AND vault_entries.deleted_at IS NOT NULL""", (vault_entry_id, user_id)).fetchone()
 
 
+# How many entries are in the Trash for vaults the user owns (no decryption)
+def count_trashed_entries(db_connection: sqlite3.Connection, user_id: str) -> int:
+    return db_connection.execute("""
+        SELECT COUNT(*)
+        FROM vault_entries
+        JOIN vaults ON vaults.vault_id = vault_entries.vault_id
+        WHERE vaults.owner_id = ? AND vault_entries.deleted_at IS NOT NULL""", (user_id,)).fetchone()[0]
+
+
 # A vault's encrypted name, used when re-locking it with a new vault key
 def get_vault_name(db_connection: sqlite3.Connection, vault_id: str) -> sqlite3.Row | None:
     return db_connection.execute("""

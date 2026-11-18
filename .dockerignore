@@ -1,0 +1,16 @@
+# Secrets and data: never copy into the image
+.env
+data/
+.nicegui/
+*.db
+
+# Local tools and caches
+.venv/
+__pycache__/
+.pytest_cache/
+.git/
+.vscode/
+
+# Not needed to run the app
+tests/
+docs/
