@@ -6,3 +6,10 @@ core/__pycache__/
 data/
 .nicegui/
 *.db
+__pycache__/
+.pytest_cache/
+venv/
+
+# CSV exports hold plaintext passwords; never commit them
+*.csv
+*.tgz

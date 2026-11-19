@@ -134,7 +134,13 @@
   }
 
   // Messages from background.js only (content scripts can't be messaged by the page)
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Is our own dropdown open in this frame? The background asks before it trusts the dropdown,
+    // so a stale context or a dropdown framed by some other page is refused.
+    if (message.type === "gk-ping") {
+      sendResponse({ open: Boolean(active) });
+      return;
+    }
     if (message.type === "gk-fill" && active) {
       // Fill only fields that are still there and visible
       if (active.username && message.username && isVisible(active.username)) {

@@ -44,6 +44,21 @@ async function getContext(tabId) {
   return (await chrome.storage.session.get(key))[key] || null;
 }
 
+// The stored context, but only while our own dropdown is really open in the clicked frame.
+// Any website can frame inline.html (it's web-accessible), and the stored context outlives a
+// navigation, so a page the tab moved on to could otherwise act on the previous site's logins.
+// The clicked frame's content script knows whether it opened a dropdown; a new page's doesn't.
+async function getOpenContext(tabId) {
+  const ctx = await getContext(tabId);
+  if (!ctx) return null;
+  try {
+    const reply = await chrome.tabs.sendMessage(tabId, { type: "gk-ping" }, { frameId: ctx.frameId });
+    return reply?.open ? ctx : null;
+  } catch {
+    return null;     // the frame is gone, or has no content script
+  }
+}
+
 // Turn the in-page icon on or off (called from the Options page)
 async function setInline(enabled) {
   const existing = await chrome.scripting.getRegisteredContentScripts({ ids: [CONTENT_SCRIPT_ID] });
@@ -67,9 +82,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Messages from the in-page dropdown must come from our own inline.html frame
     const fromInline = sender.id === chrome.runtime.id &&
       (sender.url || "").startsWith(chrome.runtime.getURL("inline.html"));
+    // Messages from content.js come from a website frame in a tab (never an extension page)
+    const fromContentScript = sender.id === chrome.runtime.id && Boolean(sender.tab) &&
+      /^https?:\/\//.test(sender.url || "");
     try {
       // From content.js: a GrishaKey icon was clicked in this frame
       if (message.type === "gk-open") {
+        if (!fromContentScript) throw new Error("Not allowed");
         if (!sender.tab || sender.frameId === undefined) throw new Error("No tab");
         await setContext(sender.tab.id, { frameId: sender.frameId, url: sender.url });
         sendResponse({ ok: true });
@@ -78,7 +97,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // From inline.js (the dropdown): which logins match the clicked frame's site?
       if (message.type === "gk-get-logins") {
-        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getOpenContext(sender.tab.id) : null;
         if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
         if (!(await getToken())) {
           sendResponse({ signedIn: false });
@@ -92,7 +112,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // From inline.js: fill this login into the clicked field
       if (message.type === "gk-fill") {
-        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getOpenContext(sender.tab.id) : null;
         if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
 
         // Re-check that this login really matches the clicked frame's site
@@ -112,6 +133,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // From inline.js: close the dropdown
       if (message.type === "gk-close") {
+        if (!fromInline) throw new Error("Not allowed");
         const ctx = sender.tab ? await getContext(sender.tab.id) : null;
         if (ctx) await chrome.tabs.sendMessage(sender.tab.id, { type: "gk-close" }, { frameId: ctx.frameId });
         sendResponse({ ok: true });
@@ -121,7 +143,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // From inline.js: open the form in a small extension window
       if (message.type === "gk-open-editor") {
         if (!fromInline) throw new Error("Not allowed");
-        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        const ctx = sender.tab ? await getOpenContext(sender.tab.id) : null;
         if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
         const params = new URLSearchParams({ site: new URL(ctx.url).origin });
         if (message.mode === "edit") {
@@ -145,7 +167,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // From inline.js: move a login to the Trash
       if (message.type === "gk-delete") {
         if (!fromInline) throw new Error("Not allowed");
-        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        const ctx = sender.tab ? await getOpenContext(sender.tab.id) : null;
         if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
         const logins = await api(`/logins?url=${encodeURIComponent(ctx.url)}`);
         const login = logins.find((l) => l.id === message.entryId);

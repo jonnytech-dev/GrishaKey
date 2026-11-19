@@ -9,6 +9,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from nicegui import app, run, ui
 
+from starlette.datastructures import MutableHeaders
 from starlette.formparsers import MultiPartParser
 
 import api
@@ -20,6 +21,41 @@ from core import auth, generator, health, sessions, storage, sharing, transfer, 
 # The folder this file lives in (the project root, since main.py sits there)
 BASE_DIR = Path(__file__).resolve().parent
 app.add_static_files("/assets", BASE_DIR / "assets")
+
+
+# Security headers on every response (pages, API, static files).
+# DENY framing stops other sites from loading the app in a hidden frame (clickjacking).
+# No strict Content-Security-Policy: NiceGUI needs inline scripts, and a wrong CSP breaks the app.
+class SecurityHeaders:
+    # Adds security headers to every HTTP response. Pure ASGI (not BaseHTTPMiddleware),
+    # so it doesn't interfere with NiceGUI's socket.io connection.
+    HEADERS = {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    }
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in self.HEADERS.items():
+                    if name not in headers:
+                        headers[name] = value
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+app.add_middleware(SecurityHeaders)
 
 # Where the database lives
 # Docker sets GRISHAKEY_DATA=/data; running locally falls back to a "data" folder here
@@ -40,6 +76,13 @@ STORAGE_SECRET = os.environ.get("STORAGE_SECRET")
 if not STORAGE_SECRET:
     raise RuntimeError(
         "STORAGE_SECRET is not set. Generate one with:\n"
+        '  python -c "import secrets; print(secrets.token_urlsafe(48))"'
+    )
+# A short secret can be guessed, and then session cookies could be forged
+STORAGE_SECRET_MIN_LENGTH = 32
+if len(STORAGE_SECRET) < STORAGE_SECRET_MIN_LENGTH:
+    raise RuntimeError(
+        f"STORAGE_SECRET is too short (at least {STORAGE_SECRET_MIN_LENGTH} characters). Generate one with:\n"
         '  python -c "import secrets; print(secrets.token_urlsafe(48))"'
     )
 
@@ -152,7 +195,12 @@ def do_create_recovery_code(user_id: str, password: str):
 def do_recover_account(email: str, code: str, new_password: str, ip_address: str):
     db_connection = storage.db_connect(DB_PATH)
     try:
-        return auth.recover_account(db_connection, email, code, new_password, ip_address)
+        new_code = auth.recover_account(db_connection, email, code, new_password, ip_address)
+        # The password was reset, so end every session this account had (web and extension)
+        user = storage.get_user_by_email(db_connection, email)
+        if user is not None:
+            sessions.destroy_user(user["user_id"])
+        return new_code
     finally:
         db_connection.close()
 
@@ -307,6 +355,9 @@ def do_change_password(session, old_password: str, new_password: str):
     db_connection = storage.db_connect(DB_PATH)
     try:
         auth.change_password(db_connection, session.user_id, old_password, new_password)
+        # End every session of this account (other browsers, the extension, and this one),
+        # so a stolen session doesn't survive the password change
+        sessions.destroy_user(session.user_id)
     finally:
         db_connection.close()
 
@@ -2821,7 +2872,10 @@ def settings_page():
                     # Clear the fields so the passwords don't sit on screen
                     for field in (current_pw, new_pw, confirm_pw):
                         field.set_value("")
-                    ui.notify("Master password changed", type="positive")
+                    # This session ended too, so sign in again with the new password
+                    app.storage.user.pop("token", None)
+                    app.storage.user["flash"] = "Master password changed. Sign in again with your new password."
+                    ui.navigate.to("/login")
 
                 with ui.row().classes("w-full justify-end mt-6"):
                     ui.button("Change password", on_click=change_password) \
