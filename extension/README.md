@@ -1,28 +1,17 @@
-# GrishaKey browser extension (Stage 1)
+# GrishaKey browser extension
 
-Find and copy your GrishaKey logins for the site you're on.
+Finds your GrishaKey logins for the site you're on, fills them with a click, and lets you save
+new ones without opening the app. Works in Chrome, Edge, and Brave.
 
-## Load it in Chrome or Edge
-
-1. Open `chrome://extensions` (or `edge://extensions`).
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and pick this `extension` folder.
-4. Open the extension's **Options**, enter your server (for example `http://127.0.0.1:9500`), and allow access.
-5. Click the GrishaKey icon on any site to sign in and see its logins.
+For installing, connecting it to your server, and turning on filling from login fields, see
+[Browser extension](../README.md#browser-extension) in the main README.
 
 ## How it stays safe
 
-- Signs in with your master password and gets a short-lived token, kept in memory only.
-- Only shows logins whose saved site matches the page (lookalike domains never match).
-- Passwords are fetched one at a time, only when you click copy.
-- Only talks to the one server you set, and requires HTTPS unless it's on this computer.
-
-## Fill from login fields (optional)
-
-Turn on **Show GrishaKey in login fields** in the extension's Options. A GrishaKey icon appears in
-password fields; click it, pick a login, and it's filled in. Your browser asks for access to all
-websites, because the icon has to appear on them. The websites themselves never see your logins:
-the list is drawn by the extension in a sealed frame, and a login is only filled after you click it,
-only into visible fields, and only on the site it belongs to.
-
-Note: copied passwords aren't cleared from the clipboard automatically yet.
+- Your sign-in token is kept in memory only, and ends after 15 minutes without use.
+- Logins only show on their own site. Lookalike domains (like `githuub.com`) never match.
+- Passwords are fetched one at a time, only when you click.
+- The list of logins is drawn by the extension in a sealed frame the website can't read.
+- Filling only happens when you click, only into visible fields.
+- It only sends your data to the server you set. Filling from login fields adds access to websites
+  so the icon can appear on them, but nothing is sent to those websites.
