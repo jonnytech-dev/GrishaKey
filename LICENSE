@@ -1,54 +1,50 @@
-GrishaKey License 1.0
+GrishaKey License 2.0
 
-Copyright (c) 2026 JonnyTech (https://jonnytech.dev)
+Copyright (c) 2026 JonnyTech (https://jonnytech.dev). All rights reserved,
+except as granted below.
 
-GrishaKey is free to use, change, and share, as long as the credit to
-JonnyTech stays in place.
+GrishaKey is free to use. You may not change it or sell it.
 
 1. What you may do
 
-   You may, free of charge and for any purpose, including commercial use:
-   a. use, run, and install GrishaKey;
-   b. change the source code and make your own versions;
-   c. share or sell copies, changed or unchanged.
+   Free of charge, you may:
+   a. download, install, and run GrishaKey and its browser extension;
+   b. use it for yourself, or within your organization (for example a
+      business, school, church, or nonprofit), including hosting it for
+      your organization's members;
+   c. change its settings using the options it provides (for example the
+      .env file and settings like APP_NAME).
 
-   You do not have to share your changes or publish your source code.
+2. What you may not do
 
-2. Your own name
+   a. Change the source code or make new works based on it, except as
+      allowed in section 3.
+   b. Sell, rent, lease, or sublicense GrishaKey, or charge anyone for it
+      or for access to it, including offering it as a paid hosted service.
+   c. Share copies, except complete, unmodified copies, free of charge,
+      with this license included.
+   d. Remove or change this license, the copyright notice, or the
+      "Powered by GrishaKey by JonnyTech" credit, which must stay visible
+      at the bottom of the main navigation and on the sign-in and sign-up
+      pages, linked to https://jonnytech.dev.
+   e. Use the names "GrishaKey" or "JonnyTech" for anything else, or say
+      or imply that JonnyTech made, reviewed, or approves something it
+      didn't. "GrishaKey" and "JonnyTech" are trademarks of JonnyTech.
 
-   You may show your own organization's name in the app, for example
-   through the APP_NAME and APP_NAME_ACCENT settings.
+3. Contributing
 
-3. The credit you must keep
+   You may make changes only to suggest them to the official repository at
+   https://github.com/jonnytech-dev/GrishaKey (for example by pull request).
+   You may test those changes, but you may not use them for real work or
+   share them in any other way. By submitting a change, you allow JonnyTech
+   to use it, change it, and license it in any way.
 
-   Any copy or changed version that has a user interface must keep this
-   notice visible to users:
-
-       Powered by GrishaKey by JonnyTech
-
-   It must appear at least:
-   a. at the bottom of the main navigation; and
-   b. on the sign-in page and the sign-up page.
-
-   Where links are possible, it must link to https://jonnytech.dev.
-   You may not remove it, hide it, change its wording, or make it hard to read.
-
-4. Notices in the code
-
-   You must keep this license and the copyright notice above in every copy,
-   changed or unchanged.
-
-5. No false claims
-
-   You may not say or imply that you created GrishaKey, or that JonnyTech
-   made, reviewed, or approves your changed version.
-
-6. If you break these terms
+4. If you break these terms
 
    Your permission under this license ends. If you fix the problem within
    30 days after being notified, your permission comes back.
 
-7. No warranty
+5. No warranty
 
    GRISHAKEY IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
