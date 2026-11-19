@@ -110,6 +110,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
+      // From inline.js: search every login. The site to compare against comes from the stored context.
+      if (message.type === "gk-search") {
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getOpenContext(sender.tab.id) : null;
+        if (!ctx) throw new Error("Click the GrishaKey icon in a login field first.");
+        const q = typeof message.q === "string" ? message.q.trim().slice(0, 100) : "";
+        if (!q) { sendResponse({ results: [] }); return; }
+        // Only the page's origin is sent: matching uses the host, and long addresses stay under the limit
+        const results = await api(`/logins/search?q=${encodeURIComponent(q)}&url=${encodeURIComponent(new URL(ctx.url).origin)}`);
+        sendResponse({ results });
+        return;
+      }
+
       // From inline.js: fill this login into the clicked field
       if (message.type === "gk-fill") {
         if (!fromInline) throw new Error("Not allowed");
@@ -118,7 +131,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // Re-check that this login really matches the clicked frame's site
         const logins = await api(`/logins?url=${encodeURIComponent(ctx.url)}`);
-        const login = logins.find((l) => l.id === message.entryId);
+        let login = logins.find((l) => l.id === message.entryId);
+        // A search result saved for another site: inline.js asked the user to confirm first.
+        // Look it up again on the server (the site still comes from the stored context).
+        if (!login && message.allowOtherSite === true && typeof message.title === "string") {
+          const q = message.title.trim().slice(0, 100);
+          if (q) {
+            const results = await api(`/logins/search?q=${encodeURIComponent(q)}&url=${encodeURIComponent(new URL(ctx.url).origin)}`);
+            login = results.find((l) => l.id === message.entryId);
+          }
+        }
         if (!login) throw new Error("That login doesn't match this site.");
 
         const { password } = await api(`/logins/${encodeURIComponent(login.id)}/password`);

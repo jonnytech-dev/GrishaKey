@@ -139,3 +139,16 @@ body { display: flex; flex-direction: column; padding-bottom: 0; }
   .menu, .menu.open, .menu.closing, .confirm-overlay, .confirm-box { transition: none; transform: none; }
   .fade-in { animation: none; }
 }
+
+/* Search box */
+.search { position: relative; margin-bottom: 12px; }
+.search input {
+  width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; font: inherit;
+  background: var(--input, var(--bg)); color: var(--ink);
+  border: 1px solid var(--line-strong, var(--line));
+}
+.search input:focus-visible { outline: 2px solid #00B570; outline-offset: 1px; }
+.search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+              width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+/* Small note on results saved for another site */
+.other-site { font-size: 11px; color: var(--muted); }

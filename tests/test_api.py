@@ -336,3 +336,41 @@ class Test_Trash_Login:
     def test_requires_sign_in(self, setup):
         client, github = setup
         assert client.delete(f"/api/v1/logins/{github}").status_code == 401
+
+
+class Test_Search:
+    def test_finds_by_title_username_and_site(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        by_title = client.get("/api/v1/logins/search", params={"q": "git"}, headers=bearer(token)).json()
+        assert [r["title"] for r in by_title] == ["GitHub"]
+        by_user = client.get("/api/v1/logins/search", params={"q": "jonnytech"}, headers=bearer(token)).json()
+        assert by_user[0]["title"] == "GitHub"
+        by_site = client.get("/api/v1/logins/search", params={"q": "google"}, headers=bearer(token)).json()
+        assert by_site[0]["title"] == "Google"
+
+    def test_never_includes_passwords(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        results = client.get("/api/v1/logins/search", params={"q": "g"}, headers=bearer(token)).json()
+        assert results and all("password" not in r for r in results)
+        assert "Gh!pw-123456" not in str(results)
+
+    def test_matches_site_flag(self, setup):
+        client, _ = setup
+        token = sign_in(client).json()["token"]
+        results = client.get("/api/v1/logins/search", headers=bearer(token),
+                             params={"q": "g", "url": "https://github.com/login"}).json()
+        flags = {r["title"]: r["matches_site"] for r in results}
+        assert flags["GitHub"] is True and flags["Google"] is False
+
+    def test_only_your_logins(self, setup):
+        client, _ = setup
+        token = sign_in(client, email="eve@gmail.com").json()["token"]
+        assert client.get("/api/v1/logins/search", params={"q": "git"}, headers=bearer(token)).json() == []
+
+    def test_requires_sign_in_and_query(self, setup):
+        client, _ = setup
+        assert client.get("/api/v1/logins/search", params={"q": "git"}).status_code == 401
+        token = sign_in(client).json()["token"]
+        assert client.get("/api/v1/logins/search", params={"q": ""}, headers=bearer(token)).status_code == 422

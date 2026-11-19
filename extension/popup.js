@@ -118,7 +118,9 @@ function renderItem(login) {
   title.textContent = login.title;
   const sub = document.createElement("div");
   sub.className = "sub";
-  sub.textContent = [login.username, login.vault].filter(Boolean).join(" · ");
+  // Search results saved for another site also say which site
+  const otherSite = login.site && login.matches_site === false ? login.site : "";
+  sub.textContent = [login.username, login.vault, otherSite].filter(Boolean).join(" · ");
   info.append(title, sub);
 
   const copyUser = document.createElement("button");
@@ -161,7 +163,9 @@ async function trashLogin(login) {
   if (!yes) return;
   try {
     await api(`/logins/${encodeURIComponent(login.id)}`, { method: "DELETE" });
-    await showLogins();
+    // Stay on the search results if a search is showing
+    if ($("search").value.trim()) await runSearch();
+    else await showLogins();
     showToast("Moved to Trash");
   } catch (err) {
     if (err.message === "signed-out") handleError(err);
@@ -188,6 +192,10 @@ async function showLogins() {
   hide("new");
   hide("login");
   show("list");
+  // The site's own list: any search is cleared (back from the form, or the box was emptied)
+  clearTimeout(searchTimer);
+  searchRequest++;
+  $("search").value = "";
   const url = await currentTabUrl();
   let host = "";
   try { host = new URL(url).hostname; } catch { /* not a web page */ }
@@ -201,8 +209,10 @@ async function showLogins() {
   $("items").replaceChildren();
   if (!host) return;
 
+  const request = searchRequest;
   try {
     const logins = await api(`/logins?url=${encodeURIComponent(url)}`);
+    if (request !== searchRequest) return;     // a search started while this was loading
     if (logins.length === 0) {
       setStatus("No saved logins for this site.");
       return;
@@ -213,6 +223,54 @@ async function showLogins() {
     handleError(err);
   }
 }
+
+// ===== Search (every login, any site) =====
+let searchTimer = null;
+let searchRequest = 0;      // number of the latest search; replies to older ones are ignored
+
+async function runSearch() {
+  const q = $("search").value.trim();
+  if (!q) { await showLogins(); return; }
+  const request = ++searchRequest;
+  // Only the tab's origin is sent: matching uses the host, and long addresses stay under the limit
+  let origin = "";
+  try {
+    const page = new URL(await currentTabUrl());
+    if (page.protocol === "http:" || page.protocol === "https:") origin = page.origin;
+  } catch { /* not a web page */ }
+  const query = new URLSearchParams({ q });
+  if (origin) query.set("url", origin);
+  try {
+    const results = await api(`/logins/search?${query}`);
+    if (request !== searchRequest) return;   // a newer search (or a cleared box) replaced this one
+    $("site").textContent = `Results for "${q}"`;
+    $("items").replaceChildren();
+    if (results.length === 0) {
+      setStatus("No logins match.");
+      return;
+    }
+    hide("status");
+    results.forEach((login) => $("items").append(renderItem(login)));
+  } catch (err) {
+    if (request === searchRequest) handleError(err);
+  }
+}
+
+$("search").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchRequest++;          // any reply still on its way is now out of date
+  if (!$("search").value.trim()) { showLogins(); return; }
+  searchTimer = setTimeout(runSearch, 200);
+});
+
+$("search").addEventListener("keydown", (event) => {
+  // Escape clears the search and goes back to this site's logins
+  if (event.key === "Escape" && $("search").value) {
+    event.preventDefault();
+    event.stopPropagation();
+    showLogins();
+  }
+});
 
 function showLogin() {
   setHeader(null);

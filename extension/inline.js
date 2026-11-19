@@ -55,7 +55,13 @@ function showList() {
   $("list-area").classList.add("fade-in");
 }
 
+let pageHost = "";        // the clicked page's host, as the background reports it (never from the page)
+let searchTimer = null;
+let searchRequest = 0;    // number of the latest search; replies to older ones are ignored
+
 function renderItem(login) {
+  // Search results carry matches_site; the site's own list doesn't (those all match)
+  const otherSite = login.matches_site === false;
   const button = document.createElement("button");
   button.className = "item";
 
@@ -72,11 +78,25 @@ function renderItem(login) {
   sub.className = "sub";
   sub.textContent = login.username || "No username";
   info.append(title, sub);
+  if (otherSite && login.site) {
+    const note = document.createElement("div");
+    note.className = "other-site";
+    note.textContent = `Saved for ${login.site}`;
+    info.append(note);
+  }
 
   button.append(tile, info);
   button.addEventListener("click", async () => {
+    let payload = { type: "gk-fill", entryId: login.id };
+    if (otherSite) {
+      // Saved for a different site: ask before filling it here
+      const savedFor = login.site ? `is saved for ${login.site}` : "has no website saved";
+      const yes = await confirmBox(`"${login.title}" ${savedFor}. Fill it on ${pageHost || "this page"} anyway?`, "Fill anyway");
+      if (!yes) return;
+      payload = { type: "gk-fill", entryId: login.id, title: login.title, allowOtherSite: true };
+    }
     message("Filling…");
-    const reply = await send({ type: "gk-fill", entryId: login.id });
+    const reply = await send(payload);
     if (reply?.error) {
       if (reply.error === "signed-out") { showSignIn("You were signed out. Sign in again."); return; }
       message(reply.error, true);
@@ -87,6 +107,8 @@ function renderItem(login) {
   row.className = "item-row";
   row.append(button);
 
+  // Edit and Move to Trash only work here for this site's logins (background.js checks the site)
+  if (otherSite) return row;
   const menuItems = [];
   if (login.can_edit) menuItems.push({ label: "Edit", onSelect: () => send({ type: "gk-open-editor", mode: "edit", entryId: login.id }) });
   if (login.can_delete) menuItems.push({ label: "Move to Trash", danger: true, onSelect: () => trashLogin(login) });
@@ -105,7 +127,8 @@ async function trashLogin(login) {
   }
   $("items").replaceChildren();
   message("");
-  await loadLogins();
+  if ($("search").value.trim()) await runSearch();
+  else await loadLogins();
 }
 
 $("new-login").addEventListener("click", () => send({ type: "gk-open-editor", mode: "new" }));
@@ -118,23 +141,73 @@ async function loadLogins() {
   }
   // Other errors show in the list area's message line, so the list area must be visible
   showList();
+  $("search").focus();
   if (reply?.error) {
     message(reply.error, true);
     fitFrame();
     return;
   }
+  pageHost = reply.host;
+  // The user started a search while this list was loading: the search shows its own results
+  if ($("search").value.trim()) return;
   const strong = document.createElement("strong");
   strong.textContent = reply.host;
   $("site").replaceChildren("Logins for ", strong);
+  $("items").replaceChildren();
+  message("");
   if (reply.logins.length === 0) {
     message("No saved logins for this site.");
     fitFrame();
     return;
   }
   reply.logins.forEach((login) => $("items").append(renderItem(login)));
-  $("items").querySelector("button")?.focus();
   fitFrame();
 }
+
+// Search every login. Results come back without passwords; a password is fetched only on fill.
+async function runSearch() {
+  const q = $("search").value.trim();
+  const request = ++searchRequest;
+  if (!q) { await loadLogins(); return; }
+  const reply = await send({ type: "gk-search", q });
+  if (request !== searchRequest) return;      // a newer search (or a cleared box) replaced this one
+  if (reply?.error) {
+    if (reply.error === "signed-out") { showSignIn("You were signed out. Sign in again."); return; }
+    message(reply.error, true);
+    fitFrame();
+    return;
+  }
+  $("site").textContent = `Results for "${q}"`;
+  $("items").replaceChildren();
+  message("");
+  if (reply.results.length === 0) message("No logins match.");
+  else reply.results.forEach((login) => $("items").append(renderItem(login)));
+  fitFrame();
+}
+
+// Back to "Logins for <site>"
+function clearSearch() {
+  clearTimeout(searchTimer);
+  searchRequest++;
+  $("search").value = "";
+  loadLogins();
+}
+
+$("search").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchRequest++;          // any reply still on its way is now out of date
+  if (!$("search").value.trim()) { clearSearch(); return; }
+  searchTimer = setTimeout(runSearch, 200);
+});
+
+$("search").addEventListener("keydown", (event) => {
+  // Escape with text clears the search; on an empty box it closes the dropdown as before
+  if (event.key === "Escape" && $("search").value) {
+    event.preventDefault();
+    event.stopPropagation();
+    clearSearch();
+  }
+});
 
 $("si-show").append(eyeIcon(true));
 $("si-show").addEventListener("click", () => {

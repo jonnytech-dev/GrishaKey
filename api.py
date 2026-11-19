@@ -3,7 +3,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from core import auth, generator, match, sessions, sharing, storage, vault
@@ -95,6 +95,31 @@ def logins_for_page(url: str, session=Depends(current_session)):
          "vault": names.get(e.vault_id, "Shared with you"), "can_edit": e.can_edit,
          "can_delete": e.vault_id in owned}
         for e in found
+    ]
+
+
+@router.get("/logins/search")
+def search_logins(q: str = Query(min_length=1, max_length=100),
+                  url: str | None = Query(default=None, max_length=2048),
+                  session=Depends(current_session)):
+    # Search every login the user can open, by title, username, or website.
+    # Never returns passwords. "matches_site" says whether it belongs to the page in `url`.
+    term = q.strip().lower()
+    with _db() as db_connection:
+        vaults = sharing.list_vaults(db_connection, session)
+        entries = vault.list_entries(db_connection, session)
+    names = {v.vault_id: v.name for v in vaults}
+    owned = {v.vault_id for v in vaults if v.is_owner}
+    found = [e for e in entries
+             if term in e.title.lower() or term in (e.username or "").lower() or term in (e.url or "").lower()]
+    found.sort(key=lambda e: e.title.lower())
+    return [
+        {"id": e.vault_entry_id, "title": e.title, "username": e.username or "",
+         "vault": names.get(e.vault_id, "Shared with you"),
+         "site": match.host_of(e.url) or "",
+         "matches_site": bool(url) and match.url_matches(e.url, url),
+         "can_edit": e.can_edit, "can_delete": e.vault_id in owned}
+        for e in found[:50]
     ]
 
 
