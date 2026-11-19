@@ -5,7 +5,6 @@ from core import crypto, storage, vault
 from core.models import VaultInfo, Session, MemberInfo
 
 
-
 # Every vault the user can see, with the name decrypted
 def list_vaults(db_connection: sqlite3.Connection, session: Session) -> list[VaultInfo]:
     vaults = []

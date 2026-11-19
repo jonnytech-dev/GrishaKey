@@ -7,12 +7,20 @@ import math
 import secrets
 import string
 from pathlib import Path
+from core.config import env_int
+import os
 
+# Password and passphrase limits (from .env, kept in safe ranges)
+MIN_LENGTH = env_int("MIN_LENGTH", 8, minimum=8, maximum=64)
+MAX_LENGTH = env_int("MAX_LENGTH", 100, minimum=16, maximum=256)
+MIN_WORDS = env_int("MIN_WORDS", 3, minimum=3, maximum=12)
+MAX_WORDS = env_int("MAX_WORDS", 12, minimum=4, maximum=20)
 
-MIN_LENGTH = 8
-MAX_LENGTH = 100
-MIN_WORDS = 3
-MAX_WORDS = 12
+# If someone sets a minimum above the maximum, fall back to the defaults
+if MIN_LENGTH > MAX_LENGTH:
+    MIN_LENGTH, MAX_LENGTH = 8, 100
+if MIN_WORDS > MAX_WORDS:
+    MIN_WORDS, MAX_WORDS = 3, 12
 
 UPPERCASE = string.ascii_uppercase
 LOWERCASE = string.ascii_lowercase

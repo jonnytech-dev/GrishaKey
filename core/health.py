@@ -2,11 +2,11 @@
 # Works on decrypted entries in memory. Nothing here is stored.
 import math
 import string
+import os
 from dataclasses import dataclass
 
-
-STRONG_BITS = 60        # 60+ bits and not reused → strong
-FAIR_BITS = 40          # 40–59 bits → "Not strong enough"; under 40 → weak
+STRONG_BITS = int(os.enviorn.get("STRONG_BITS", "60"))       # 60+ bits and not reused → strong
+FAIR_BITS = int(os.enviorn.get("FAIR_BITS", "40"))           # 40–59 bits → "Not strong enough"; under 40 → weak
 
 # A short list of very common passwords and base words. Matching one makes a password weak,
 # even with numbers or symbols added ("Sunshine2024!").

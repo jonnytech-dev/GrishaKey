@@ -5,10 +5,21 @@ import string
 from dataclasses import dataclass, field
 from core.models import Session
 import os
+from core.config import env_int
 from cryptography.exceptions import InvalidTag
 
-MAX_FAILED_LOGIN_ATTEMPTS=10
-MAX_FAILED_REGISTER_ATTEMPTS=5
+def _env_int(name: str, default: int, minimum: int = 1, maximum: int = 100) -> int:
+    # A whole number from .env, kept within safe limits.
+    # Bad or missing values fall back to the default instead of crashing or disabling the lockout.
+    try:
+        value = int(os.environ.get(name, default))
+    except ValueError:
+        return default
+    return max(minimum, min(value, maximum))
+
+# Password and passphrase limits (from .env, kept in safe ranges)
+MAX_FAILED_LOGIN_ATTEMPTS = env_int("MAX_FAILED_LOGIN_ATTEMPTS", 10, minimum=5, maximum=60)
+MAX_FAILED_REGISTER_ATTEMPTS = env_int("MAX_FAILED_REGISTER_ATTEMPTS", 5, minimum=5, maximum=60)
 
 # ---------- Custom error exceptions ----------
 # Username or email is already taken
