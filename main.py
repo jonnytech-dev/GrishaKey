@@ -18,6 +18,10 @@ from core import auth, generator, health, sessions, storage, sharing, transfer, 
 
 # ========== Config ==========
 
+# Config section:
+HOST = os.environ.get("GRISHAKEY_HOST", "127.0.0.1")
+PORT = int(os.environ.get("GRISHAKEY_PORT", "9500"))
+
 # The folder this file lives in (the project root, since main.py sits there)
 BASE_DIR = Path(__file__).resolve().parent
 app.add_static_files("/assets", BASE_DIR / "assets")
@@ -3209,8 +3213,8 @@ def help_page():
 # NiceGUI recommends this check so the app only starts once
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(
-        host="127.0.0.1",          # only this computer can reach it
-        port=9500,
+        host=HOST,
+        port=PORT,
         title=f"{APP_FULL_NAME}",
         favicon=BASE_DIR / "assets" / "favicon.png",
         storage_secret=STORAGE_SECRET,
