@@ -933,6 +933,27 @@ def _apply_theme():
                 .gk-show-mobile { display: inline-flex !important; }
             }
 
+            /* ===== Segmented toggles (same style as the website's view switcher) ===== */
+            .gk-segmented.q-btn-group {
+                display: inline-flex; flex-wrap: nowrap; gap: 4px; padding: 4px;
+                background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;
+                box-shadow: none; max-width: 100%; overflow-x: auto;
+            }
+            .gk-segmented .q-btn {
+                border-radius: 12px !important; padding: 8px 16px; min-height: 40px;
+                font-weight: 600; font-size: 15px; color: #64748b !important;
+                background: transparent !important;
+                transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            }
+            .gk-segmented .q-btn:hover { color: #0f172a !important; }
+            .gk-segmented .q-btn:before { box-shadow: none !important; }
+            /* The selected option (Quasar gives it the toggle color class) */
+            .gk-segmented .q-btn.bg-primary {
+                background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%) !important;
+                color: #ffffff !important;
+                box-shadow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
+            }
+
             /* ===== Dark theme (Quasar adds body--dark when dark mode is on) ===== */
             body.body--dark {
                 background:
@@ -1006,6 +1027,10 @@ def _apply_theme():
             .body--dark .gk-bottom-nav { background: rgba(15, 23, 42, 0.92); border-top-color: #1e293b; }
             .body--dark .gk-tab { color: #94a3b8; }
             .body--dark .gk-tab-active { background: rgba(22, 163, 74, 0.18); color: #4ade80; }
+            .body--dark .gk-segmented.q-btn-group { background: #0f172a; border-color: #1e293b; }
+            .body--dark .gk-segmented .q-btn { color: #94a3b8 !important; }
+            .body--dark .gk-segmented .q-btn:hover { color: #f1f5f9 !important; }
+            .body--dark .gk-segmented .q-btn.bg-primary { color: #ffffff !important; }
 
             /* Text colors written for light mode, flipped for dark */
             .body--dark .text-slate-900 { color: #f1f5f9 !important; }
@@ -1016,6 +1041,7 @@ def _apply_theme():
             .body--dark .text-slate-400 { color: #64748b !important; }
             .body--dark .bg-green-50 { background-color: rgba(22, 163, 74, 0.15) !important; }
             .body--dark .bg-slate-200 { background-color: #1e293b !important; }
+            .body--dark .bg-slate-100 { background-color: #1e293b !important; }
             .body--dark .gk-credit-link { color: #94a3b8; }
             .body--dark .gk-credit-link:hover { color: #4ade80; }
             .body--dark .gk-credit-dot { color: #475569; }
@@ -2566,7 +2592,8 @@ def passwords_page(filter: str = "all"):
         with ui.row().classes("w-full items-center justify-between no-wrap mt-6 gap-4"):
             ui.toggle({"all": "All", "shared": "Shared with me", "issues": "Needs attention"},
                       value=state["filter"], on_change=on_filter) \
-                .props("no-caps unelevated rounded toggle-color=green-7")
+                .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
+                .classes("gk-segmented")
             ui.select({"asc": "A → Z", "desc": "Z → A"}, value="asc", label="Sort", on_change=on_sort) \
                 .props("outlined dense").classes("gk-input").style("width: 140px")
 
@@ -2615,20 +2642,22 @@ def trash_page():
                 e = item.entry
                 with ui.element("div").classes("gk-vault-card p-4 w-full"):
                     with ui.row().classes("w-full items-center no-wrap gap-4"):
-                        with ui.element("div").classes("rounded-xl bg-slate-100 flex items-center justify-center") \
+                        with ui.element("div").classes("rounded-xl bg-slate-100 flex items-center justify-center shrink-0") \
                                 .style("width: 48px; height: 48px"):
                             ui.label((e.title[:1] or "?").upper()).classes("text-lg font-extrabold text-slate-500")
                         with ui.column().classes("gap-0 flex-1 min-w-0"):
-                            ui.label(e.title).classes("font-semibold text-slate-900 truncate")
+                            ui.label(e.title).classes("font-semibold text-slate-900 truncate w-full")
                             # deleted_at looks like "2026-11-16 14:03:22" (UTC); show the date part
-                            ui.label(f'{vault_names.get(e.vault_id, "Vault")} · moved to Trash {item.deleted_at[:10]}') \
-                                .classes("text-sm text-slate-500 truncate")
-                        with ui.row().classes("gap-1 no-wrap items-center gk-hide-mobile"):
+                            ui.label(vault_names.get(e.vault_id, "Vault")) \
+                                .classes("text-sm text-slate-500 truncate w-full")
+                            ui.label(f"Moved to Trash {item.deleted_at[:10]}") \
+                                .classes("text-xs text-slate-400 truncate w-full")
+                        with ui.row().classes("gap-1 no-wrap items-center gk-hide-mobile shrink-0"):
                             ui.button("Restore", icon="restore", on_click=lambda e=e: restore(e)) \
                                 .props("outline no-caps color=grey-8").classes("rounded-lg")
                             ui.button(icon="delete_forever", on_click=lambda e=e: confirm_delete(e)) \
                                 .props("flat round color=negative").tooltip("Delete forever")
-                        with ui.button(icon="more_vert").props("flat round dense color=grey-7").classes("gk-show-mobile"):
+                        with ui.button(icon="more_vert").props("flat round dense color=grey-7").classes("gk-show-mobile shrink-0"):
                             with ui.menu():
                                 ui.menu_item("Restore", on_click=lambda e=e: restore(e))
                                 ui.menu_item("Delete forever", on_click=lambda e=e: confirm_delete(e)) \
@@ -2763,7 +2792,8 @@ def generator_page():
 
             # ===== Mode =====
             ui.toggle({"password": "Password", "passphrase": "Passphrase"}, value="password", on_change=set_mode) \
-                .props("no-caps unelevated rounded toggle-color=green-7").classes("mt-6")
+                .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
+                .classes("gk-segmented mt-6")
 
             # ===== Password options =====
             with ui.element("div").classes("gk-panel w-full p-6 mt-4") as password_options:
@@ -3108,7 +3138,8 @@ def settings_page():
 
                 ui.toggle({"light": "Light", "dark": "Dark", "auto": "System"},
                           value=app.storage.user.get("theme", "light"), on_change=set_theme) \
-                    .props("no-caps unelevated rounded toggle-color=green-7").classes("mt-5")
+                    .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
+                    .classes("gk-segmented mt-5")
 
             # ===== Sign out =====
             with ui.element("div").classes("gk-panel w-full p-6 mt-6 mb-10"):
