@@ -895,6 +895,8 @@ def _apply_theme():
 
             /* ===== Mobile layout ===== */
             .gk-mobile-only { display: none; }
+            /* Phones: icon groups hide, a ⋮ menu shows instead */
+            .gk-show-mobile { display: none !important; }
             .gk-bottom-nav {
                 position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
                 display: none; justify-content: space-around; align-items: center;
@@ -916,6 +918,8 @@ def _apply_theme():
                 .gk-dash-hero .text-4xl { font-size: 2rem; line-height: 2.5rem; }
                 .gk-issue-chevron { display: none; }
                 .gk-badge { font-size: 12px; padding: 4px 9px; gap: 4px; }
+                .gk-hide-mobile { display: none !important; }
+                .gk-show-mobile { display: inline-flex !important; }
             }
 
             /* ===== Dark theme (Quasar adds body--dark when dark mode is on) ===== */
@@ -1748,7 +1752,7 @@ def _entry_row(session, vault_id, e, can_share: bool, source: str | None = None,
                             ui.label(issue_detail).classes("text-xs text-slate-500")
 
             # Quick copy without opening the entry (.stop keeps the click off the row)
-            with ui.row().classes("gap-1 no-wrap"):
+            with ui.row().classes("gap-1 no-wrap gk-hide-mobile"):
                 if e.username:
                     ui.button(icon="person_outline", on_click=lambda u=e.username: copy_text(u, "Username")) \
                         .props("flat round dense color=grey-7").tooltip("Copy username") \
@@ -1771,6 +1775,23 @@ def _entry_row(session, vault_id, e, can_share: bool, source: str | None = None,
                     ui.button(icon="delete_outline", on_click=lambda e=e: _open_delete_entry_dialog(session, e, return_to=return_to)) \
                         .props("flat round dense color=grey-7").tooltip("Move to Trash") \
                         .on("click.stop", lambda: None)
+
+            # Phones: the same actions in a ⋮ menu (the icons above are hidden there)
+            with ui.button(icon="more_vert").props("flat round dense color=grey-7") \
+                    .classes("gk-show-mobile").on("click.stop", lambda: None):
+                with ui.menu():
+                    if e.username:
+                        ui.menu_item("Copy username", on_click=lambda u=e.username: copy_text(u, "Username"))
+                    if e.password:
+                        ui.menu_item("Copy password", on_click=lambda p=e.password: copy_password(p))
+                    if can_share:
+                        ui.menu_item("Share", on_click=lambda e=e: _open_manage_entry_sharing(session, e))
+                    if e.can_edit:
+                        ui.menu_item("Edit", on_click=lambda e=e: _open_edit_entry_dialog(session, e, return_to=return_to))
+                    if can_share:
+                        ui.menu_item("Move to Trash",
+                                     on_click=lambda e=e: _open_delete_entry_dialog(session, e, return_to=return_to)) \
+                            .classes("text-red-600")
 
 
 def _detail_row(icon: str, key: str, value: str | None, link: str | None = None):
@@ -2311,10 +2332,18 @@ def vault_detail_page(vault_id: str):
                 if current.is_owner:
                     ui.button("Share", icon="group_add",
                               on_click=lambda: _open_manage_vault_sharing(session, vault_id, current.name)) \
-                        .props("outline no-caps color=grey-8").classes("rounded-xl px-5 font-semibold")
+                        .props("outline no-caps color=grey-8").classes("rounded-xl px-5 font-semibold gk-hide-mobile")
                 if current.can_edit:
                     ui.button("Add entry", icon="add", on_click=entry_dialog.open) \
-                        .props("unelevated no-caps").classes("rounded-xl px-5 font-semibold gradient-bg")
+                        .props("unelevated no-caps").classes("rounded-xl px-5 font-semibold gradient-bg gk-hide-mobile")
+                if current.can_edit:
+                    ui.button(icon="add", on_click=entry_dialog.open) \
+                        .props("unelevated round").classes("gradient-bg gk-show-mobile").tooltip("Add entry")
+                if current.is_owner:
+                    with ui.button(icon="more_vert").props("flat round color=grey-8").classes("gk-show-mobile"):
+                        with ui.menu():
+                            ui.menu_item("Share vault",
+                                         on_click=lambda: _open_manage_vault_sharing(session, vault_id, current.name))
 
         entry_list()
 
@@ -2373,7 +2402,7 @@ def entry_detail_page(vault_id: str, entry_id: str):
                         if current is None:
                             ui.label("Shared with you").classes("gk-pill")
 
-            with ui.row().classes("items-center gap-2 no-wrap"):
+            with ui.row().classes("items-center gap-2 no-wrap gk-hide-mobile"):
                 if is_owner:
                     ui.button("Share", icon="person_add_alt",
                               on_click=lambda: _open_manage_entry_sharing(session, entry)) \
@@ -2384,6 +2413,18 @@ def entry_detail_page(vault_id: str, entry_id: str):
                 if is_owner:
                     with ui.button(icon="more_vert").props("flat round color=grey-8"):
                         with ui.menu():
+                            ui.menu_item("Move to Trash", on_click=lambda: _open_delete_entry_dialog(session, entry)) \
+                                .classes("text-red-600")
+
+            # Phones: Share, Edit, and Move to Trash in one ⋮ menu
+            if is_owner or entry.can_edit:
+                with ui.button(icon="more_vert").props("flat round color=grey-8").classes("gk-show-mobile"):
+                    with ui.menu():
+                        if is_owner:
+                            ui.menu_item("Share", on_click=lambda: _open_manage_entry_sharing(session, entry))
+                        if entry.can_edit:
+                            ui.menu_item("Edit", on_click=lambda: _open_edit_entry_dialog(session, entry))
+                        if is_owner:
                             ui.menu_item("Move to Trash", on_click=lambda: _open_delete_entry_dialog(session, entry)) \
                                 .classes("text-red-600")
 
@@ -2571,10 +2612,16 @@ def trash_page():
                             # deleted_at looks like "2026-11-16 14:03:22" (UTC); show the date part
                             ui.label(f'{vault_names.get(e.vault_id, "Vault")} · moved to Trash {item.deleted_at[:10]}') \
                                 .classes("text-sm text-slate-500 truncate")
-                        ui.button("Restore", icon="restore", on_click=lambda e=e: restore(e)) \
-                            .props("outline no-caps color=grey-8").classes("rounded-lg")
-                        ui.button(icon="delete_forever", on_click=lambda e=e: confirm_delete(e)) \
-                            .props("flat round color=negative").tooltip("Delete forever")
+                        with ui.row().classes("gap-1 no-wrap items-center gk-hide-mobile"):
+                            ui.button("Restore", icon="restore", on_click=lambda e=e: restore(e)) \
+                                .props("outline no-caps color=grey-8").classes("rounded-lg")
+                            ui.button(icon="delete_forever", on_click=lambda e=e: confirm_delete(e)) \
+                                .props("flat round color=negative").tooltip("Delete forever")
+                        with ui.button(icon="more_vert").props("flat round dense color=grey-7").classes("gk-show-mobile"):
+                            with ui.menu():
+                                ui.menu_item("Restore", on_click=lambda e=e: restore(e))
+                                ui.menu_item("Delete forever", on_click=lambda e=e: confirm_delete(e)) \
+                                    .classes("text-red-600")
 
     async def restore(e):
         restored = await run.io_bound(do_restore_entry, session, e.vault_entry_id)
