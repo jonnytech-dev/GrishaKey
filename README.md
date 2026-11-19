@@ -284,6 +284,7 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 No Python? Any random string of 32 or more characters works, for example from a password generator.
+FYI, there are other .env options you can set that are found in the .env.example
 
 **2. Start it**
 
