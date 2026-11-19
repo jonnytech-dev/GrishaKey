@@ -11,6 +11,50 @@ function send(payload) {
   return chrome.runtime.sendMessage(payload);
 }
 
+// Eye icons for the password field (built without innerHTML)
+function eyeIcon(open) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", open
+    ? "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
+    : "M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1.1");
+  svg.append(path);
+  return svg;
+}
+
+// Ask the page to size this frame to fit what's showing (smoothly)
+function fitFrame() {
+  requestAnimationFrame(() => {
+    send({ type: "gk-resize", height: Math.ceil(document.body.scrollHeight) + 2 });
+  });
+}
+
+function showSignIn(errorText = "") {
+  $("list-area").classList.add("hidden");
+  $("head-brand").classList.add("hidden");
+  $("signin").classList.remove("hidden");
+  $("signin").classList.add("fade-in");
+  if (errorText) {
+    $("si-error").replaceChildren(errorText);
+    $("si-error").classList.remove("hidden");
+  }
+  $("si-email").focus();
+  fitFrame();
+}
+
+function showList() {
+  $("signin").classList.add("hidden");
+  $("head-brand").classList.remove("hidden");
+  $("list-area").classList.remove("hidden");
+  $("list-area").classList.add("fade-in");
+}
+
 function renderItem(login) {
   const button = document.createElement("button");
   button.className = "item";
@@ -34,7 +78,8 @@ function renderItem(login) {
     message("Filling…");
     const reply = await send({ type: "gk-fill", entryId: login.id });
     if (reply?.error) {
-      message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
+      if (reply.error === "signed-out") { showSignIn("You were signed out. Sign in again."); return; }
+      message(reply.error, true);
     }
   });
 
@@ -54,7 +99,8 @@ async function trashLogin(login) {
   if (!yes) return;
   const reply = await send({ type: "gk-delete", entryId: login.id });
   if (reply?.error) {
-    message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
+    if (reply.error === "signed-out") { showSignIn("You were signed out. Sign in again."); return; }
+    message(reply.error, true);
     return;
   }
   $("items").replaceChildren();
@@ -66,12 +112,15 @@ $("new-login").addEventListener("click", () => send({ type: "gk-open-editor", mo
 
 async function loadLogins() {
   const reply = await send({ type: "gk-get-logins" });
-  if (reply?.error) {
-    message(reply.error === "signed-out" ? "Signed out. Click the GrishaKey toolbar icon to sign in." : reply.error, true);
+  if (reply?.error === "signed-out" || (reply && !reply.error && !reply.signedIn)) {
+    showSignIn();
     return;
   }
-  if (!reply.signedIn) {
-    message("Click the GrishaKey toolbar icon to sign in.");
+  // Other errors show in the list area's message line, so the list area must be visible
+  showList();
+  if (reply?.error) {
+    message(reply.error, true);
+    fitFrame();
     return;
   }
   const strong = document.createElement("strong");
@@ -79,11 +128,39 @@ async function loadLogins() {
   $("site").replaceChildren("Logins for ", strong);
   if (reply.logins.length === 0) {
     message("No saved logins for this site.");
+    fitFrame();
     return;
   }
   reply.logins.forEach((login) => $("items").append(renderItem(login)));
   $("items").querySelector("button")?.focus();
+  fitFrame();
 }
+
+$("si-show").append(eyeIcon(true));
+$("si-show").addEventListener("click", () => {
+  const hidden = $("si-password").type === "password";
+  $("si-password").type = hidden ? "text" : "password";
+  $("si-show").replaceChildren(eyeIcon(!hidden));
+  $("si-show").setAttribute("aria-label", hidden ? "Hide password" : "Show password");
+});
+
+$("signin").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  $("si-error").classList.add("hidden");
+  $("si-submit").disabled = true;
+  $("si-submit").textContent = "Signing in…";
+  const reply = await send({ type: "gk-login", email: $("si-email").value.trim(), password: $("si-password").value });
+  $("si-submit").disabled = false;
+  $("si-submit").textContent = "Sign in";
+  $("si-password").value = "";
+  if (reply?.error) {
+    $("si-error").replaceChildren(reply.error);
+    $("si-error").classList.remove("hidden");
+    fitFrame();
+    return;
+  }
+  await loadLogins();
+});
 
 loadLogins();
 

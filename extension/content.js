@@ -4,6 +4,7 @@
 (() => {
   if (window.__grishakeyLoaded) return;
   window.__grishakeyLoaded = true;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const ICON_SIZE = 22;
   const marked = new WeakSet();     // password fields that already have an icon
@@ -39,8 +40,14 @@
   }
 
   function closeDropdown() {
-    if (active?.frame) active.frame.remove();
+    if (!active?.frame) { active = null; return; }
+    const frame = active.frame;
     active = null;
+    if (reduceMotion) { frame.remove(); return; }
+    frame.style.opacity = "0";
+    frame.style.transform = "translateY(-6px) scale(0.98)";
+    frame.style.pointerEvents = "none";
+    setTimeout(() => frame.remove(), 170);
   }
 
   function openDropdown(passwordField, anchorField) {
@@ -60,8 +67,16 @@
       boxShadow: "0 20px 50px -12px rgba(0,0,0,0.35)",
       zIndex: "2147483647",
       colorScheme: "normal",
+      opacity: "0",
+      transform: "translateY(-6px) scale(0.98)",
+      transformOrigin: "top left",
+      transition: reduceMotion ? "none" : "opacity 160ms ease, transform 160ms ease, height 180ms ease",
     });
     document.body.appendChild(frame);
+    requestAnimationFrame(() => {
+      frame.style.opacity = "1";
+      frame.style.transform = "none";
+    });
     active = { username: findUsernameField(passwordField), password: passwordField, frame };
     chrome.runtime.sendMessage({ type: "gk-open" });
   }
@@ -129,6 +144,9 @@
       closeDropdown();
     }
     if (message.type === "gk-close") closeDropdown();
+    if (message.type === "gk-resize" && active?.frame) {
+      active.frame.style.height = `${message.height}px`;
+    }
   });
 
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeDropdown(); });

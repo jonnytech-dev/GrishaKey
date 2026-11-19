@@ -155,6 +155,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
 
+      // From inline.js: sign in from the in-page dropdown.
+      // The dropdown never keeps the token; it's stored here, in memory-only session storage.
+      if (message.type === "gk-login") {
+        if (!fromInline) throw new Error("Not allowed");
+        const email = typeof message.email === "string" ? message.email.slice(0, 320) : "";
+        const password = typeof message.password === "string" ? message.password.slice(0, 256) : "";
+        const server = await getServer();
+        if (!server) throw new Error("Set your GrishaKey server in the extension's Options first.");
+        let response;
+        try {
+          response = await fetch(`${server}/api/v1/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+        } catch {
+          throw new Error("Can't reach your GrishaKey server.");
+        }
+        if (response.status === 401) throw new Error("Incorrect email or password");
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(typeof body.detail === "string" ? body.detail : "Sign-in failed. Try again.");
+        }
+        const { token } = await response.json();
+        await chrome.storage.session.set({ token, email });
+        sendResponse({ ok: true });
+        return;
+      }
+
+      // From inline.js: resize the dropdown frame to fit its content
+      if (message.type === "gk-resize") {
+        if (!fromInline) throw new Error("Not allowed");
+        const ctx = sender.tab ? await getContext(sender.tab.id) : null;
+        const height = Math.max(140, Math.min(460, Number(message.height) || 320));
+        if (ctx) await chrome.tabs.sendMessage(sender.tab.id, { type: "gk-resize", height }, { frameId: ctx.frameId });
+        sendResponse({ ok: true });
+        return;
+      }
+
       // From options.js (an extension page): turn the in-page icon on or off
       if (message.type === "gk-set-inline") {
         // Only the extension's own pages (like Options) may change this, never a website.

@@ -4,8 +4,12 @@
 let openMenuEl = null;
 
 function closeMenu() {
-  if (openMenuEl) openMenuEl.remove();
+  if (!openMenuEl) return;
+  const menu = openMenuEl;
   openMenuEl = null;
+  menu.classList.remove("open");
+  menu.classList.add("closing");
+  setTimeout(() => menu.remove(), 150);
 }
 
 // items: [{ label, danger?, onSelect }]
@@ -37,6 +41,7 @@ function openMenu(anchor, items) {
   const left = Math.max(4, Math.min(a.right - m.width, window.innerWidth - m.width - 4));
   menu.style.top = `${top}px`;
   menu.style.left = `${left}px`;
+  requestAnimationFrame(() => menu.classList.add("open"));
   openMenuEl = menu;
   menu.querySelector("button")?.focus();
 }
@@ -101,9 +106,14 @@ function confirmBox(message, confirmLabel = "Confirm") {
     box.append(text, actions);
     overlay.append(box);
     document.body.append(overlay);
+    requestAnimationFrame(() => overlay.classList.add("open"));
     ok.focus();
 
-    const done = (answer) => { overlay.remove(); resolve(answer); };
+    const done = (answer) => {
+      overlay.classList.remove("open");
+      setTimeout(() => overlay.remove(), 160);
+      resolve(answer);
+    };
     cancel.addEventListener("click", () => done(false));
     ok.addEventListener("click", () => done(true));
     overlay.addEventListener("click", (event) => { if (event.target === overlay) done(false); });

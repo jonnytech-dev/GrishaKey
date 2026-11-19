@@ -7,14 +7,34 @@
 </head>
 <body>
   <div class="head">
-    <div class="brand">Grisha<span>Key</span></div>
+    <div class="brand" id="head-brand">Grisha<span>Key</span></div>
     <button class="close" id="close" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <div class="site" id="site"></div>
-  <div id="items"></div>
-  <p class="msg" id="msg"></p>
-  <div class="footer">
-    <button type="button" class="new-login-btn" id="new-login">+ New login</button>
+  <!-- Signed out: sign in right here -->
+  <form id="signin" class="signin hidden" autocomplete="on">
+    <div class="signin-head">
+      <div class="brand brand-md">Grisha<span>Key</span></div>
+      <p class="signin-sub">Sign in to fill your logins</p>
+    </div>
+    <label for="si-email">Email</label>
+    <input id="si-email" type="email" autocomplete="username" required maxlength="320">
+    <label for="si-password">Master password</label>
+    <div class="field-wrap">
+      <input id="si-password" type="password" autocomplete="current-password" required maxlength="256">
+      <button type="button" class="eye-btn" id="si-show" aria-label="Show password"></button>
+    </div>
+    <button type="submit" class="signin-btn" id="si-submit">Sign in</button>
+    <p class="msg error hidden" id="si-error"></p>
+  </form>
+
+  <!-- Signed in: logins for this site -->
+  <div id="list-area" class="hidden">
+    <div class="site" id="site"></div>
+    <div id="items"></div>
+    <p class="msg" id="msg"></p>
+    <div class="footer">
+      <button type="button" class="new-login-btn" id="new-login">+ New login</button>
+    </div>
   </div>
   <script src="menu.js"></script>
   <script src="inline.js"></script>

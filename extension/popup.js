@@ -6,7 +6,13 @@ const $ = (id) => document.getElementById(id);
 // Opened as a separate window from the in-page dropdown (Edit or + New login)
 const pageParams = new URLSearchParams(location.search);
 const windowMode = pageParams.get("mode");            // "new", "edit", or null (normal popup)
-const show = (id) => $(id).classList.remove("hidden");
+const show = (id) => {
+  const el = $(id);
+  el.classList.remove("hidden");
+  el.classList.remove("fade-in");
+  void el.offsetWidth;            // restart the animation
+  el.classList.add("fade-in");
+};
 const hide = (id) => $(id).classList.add("hidden");
 
 // Clone a fixed SVG icon from the <template>s in popup.html (never server data)
