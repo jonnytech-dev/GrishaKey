@@ -4,6 +4,7 @@ import string
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse
@@ -153,6 +154,34 @@ def _brand(size_classes: str):
             ui.label(APP_NAME).classes(f"{size_classes} font-extrabold tracking-tight text-slate-900")
         if APP_NAME_ACCENT:
             ui.label(APP_NAME_ACCENT).classes(f"{size_classes} font-extrabold tracking-tight gradient-text")
+
+
+def _segmented(options: dict, value, on_change):
+    # A pill switch with the selected option in the brand gradient.
+    # Same look as the website's "Desktop view / Mobile view" switcher.
+    # on_change gets an object with .value, like ui.toggle's event.
+    state = {"value": value}
+    buttons = {}
+
+    def select(key):
+        if key == state["value"]:
+            return
+        old = state["value"]
+        state["value"] = key
+        buttons[old].classes(remove="gk-seg-on").props("aria-pressed=false")
+        buttons[key].classes(add="gk-seg-on").props("aria-pressed=true")
+        on_change(SimpleNamespace(value=key))
+
+    with ui.element("div").classes("gk-seg").props("role=group") as root:
+        for key, label in options.items():
+            selected = key == value
+            button = ui.element("button").classes("gk-seg-btn" + (" gk-seg-on" if selected else "")) \
+                .props(f"type=button aria-pressed={'true' if selected else 'false'}")
+            with button:
+                ui.label(label)
+            button.on("click", lambda k=key: select(k))
+            buttons[key] = button
+    return root
 
 def _credit_links(extra_classes: str = ""):
     # Small "Website · GitHub" links, with the required "Powered by GrishaKey by JonnyTech" under them.
@@ -931,28 +960,35 @@ def _apply_theme():
                 .gk-badge { font-size: 12px; padding: 4px 9px; gap: 4px; }
                 .gk-hide-mobile { display: none !important; }
                 .gk-show-mobile { display: inline-flex !important; }
+                .gk-seg { display: flex; width: 100%; }
+                .gk-seg-btn { flex: 1 1 auto; padding: 10px 12px; font-size: 14px; }
             }
 
-            /* ===== Segmented toggles (same style as the website's view switcher) ===== */
-            .gk-segmented.q-btn-group {
+            /* ===== Segmented switch (same as the website's view switcher) ===== */
+            .gk-seg {
                 display: inline-flex; flex-wrap: nowrap; gap: 4px; padding: 4px;
                 background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;
-                box-shadow: none; max-width: 100%; overflow-x: auto;
+                max-width: 100%; overflow-x: auto; scrollbar-width: none;
             }
-            .gk-segmented .q-btn {
-                border-radius: 12px !important; padding: 8px 16px; min-height: 40px;
-                font-weight: 600; font-size: 15px; color: #64748b !important;
-                background: transparent !important;
+            .gk-seg::-webkit-scrollbar { display: none; }
+            .gk-seg-btn {
+                display: inline-flex; align-items: center; justify-content: center;
+                white-space: nowrap; padding: 12px 18px; border: 0; border-radius: 12px;
+                background: none; color: #64748b; cursor: pointer;
+                font: 600 15px/1 'Inter', sans-serif;
                 transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
             }
-            .gk-segmented .q-btn:hover { color: #0f172a !important; }
-            .gk-segmented .q-btn:before { box-shadow: none !important; }
-            /* The selected option (Quasar gives it the toggle color class) */
-            .gk-segmented .q-btn.bg-primary {
-                background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%) !important;
-                color: #ffffff !important;
+            .gk-seg-btn:hover { color: #0f172a; }
+            .gk-seg-btn:focus-visible { outline: 2px solid #00B570; outline-offset: 2px; }
+            .gk-seg-btn.gk-seg-on {
+                background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+                color: #ffffff;
                 box-shadow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
             }
+
+            /* Filter + sort bar: side by side on wide screens, stacked on phones */
+            .gk-filter-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+            .gk-filter-bar .gk-sort { margin-left: auto; }
 
             /* ===== Dark theme (Quasar adds body--dark when dark mode is on) ===== */
             body.body--dark {
@@ -1027,10 +1063,10 @@ def _apply_theme():
             .body--dark .gk-bottom-nav { background: rgba(15, 23, 42, 0.92); border-top-color: #1e293b; }
             .body--dark .gk-tab { color: #94a3b8; }
             .body--dark .gk-tab-active { background: rgba(22, 163, 74, 0.18); color: #4ade80; }
-            .body--dark .gk-segmented.q-btn-group { background: #0f172a; border-color: #1e293b; }
-            .body--dark .gk-segmented .q-btn { color: #94a3b8 !important; }
-            .body--dark .gk-segmented .q-btn:hover { color: #f1f5f9 !important; }
-            .body--dark .gk-segmented .q-btn.bg-primary { color: #ffffff !important; }
+            .body--dark .gk-seg { background: #0f172a; border-color: #1e293b; }
+            .body--dark .gk-seg-btn { color: #94a3b8; }
+            .body--dark .gk-seg-btn:hover { color: #f1f5f9; }
+            .body--dark .gk-seg-btn.gk-seg-on { color: #ffffff; }
 
             /* Text colors written for light mode, flipped for dark */
             .body--dark .text-slate-900 { color: #f1f5f9 !important; }
@@ -2588,14 +2624,12 @@ def passwords_page(filter: str = "all"):
             ui.label("Passwords").classes("text-3xl font-extrabold tracking-tight text-slate-900")
             ui.label("Every login you can open, in one place.").classes("text-slate-500")
 
-        # Filter on the left, sort on the right
-        with ui.row().classes("w-full items-center justify-between no-wrap mt-6 gap-4"):
-            ui.toggle({"all": "All", "shared": "Shared with me", "issues": "Needs attention"},
-                      value=state["filter"], on_change=on_filter) \
-                .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
-                .classes("gk-segmented")
+        # Filter on the left, sort on the right (stacks on phones)
+        with ui.element("div").classes("gk-filter-bar w-full mt-6"):
+            _segmented({"all": "All", "shared": "Shared with me", "issues": "Needs attention"},
+                       state["filter"], on_filter)
             ui.select({"asc": "A → Z", "desc": "Z → A"}, value="asc", label="Sort", on_change=on_sort) \
-                .props("outlined dense").classes("gk-input").style("width: 140px")
+                .props("outlined dense").classes("gk-input gk-sort").style("width: 140px")
 
         password_list()
 
@@ -2791,9 +2825,8 @@ def generator_page():
                 strength_label = ui.label("").classes("text-sm font-semibold text-slate-600 mt-2")
 
             # ===== Mode =====
-            ui.toggle({"password": "Password", "passphrase": "Passphrase"}, value="password", on_change=set_mode) \
-                .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
-                .classes("gk-segmented mt-6")
+            with ui.element("div").classes("mt-6"):
+                _segmented({"password": "Password", "passphrase": "Passphrase"}, "password", set_mode)
 
             # ===== Password options =====
             with ui.element("div").classes("gk-panel w-full p-6 mt-4") as password_options:
@@ -3136,10 +3169,9 @@ def settings_page():
                     app.storage.user["theme"] = e.value
                     dark.set_value(THEMES[e.value])
 
-                ui.toggle({"light": "Light", "dark": "Dark", "auto": "System"},
-                          value=app.storage.user.get("theme", "light"), on_change=set_theme) \
-                    .props('no-caps unelevated color=transparent text-color=grey-8 toggle-color=primary toggle-text-color=white') \
-                    .classes("gk-segmented mt-5")
+                with ui.element("div").classes("mt-5"):
+                    _segmented({"light": "Light", "dark": "Dark", "auto": "System"},
+                               app.storage.user.get("theme", "light"), set_theme)
 
             # ===== Sign out =====
             with ui.element("div").classes("gk-panel w-full p-6 mt-6 mb-10"):
