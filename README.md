@@ -555,10 +555,4 @@ The suite covers encryption, labels and tamper detection, login lockout and timi
 
 ## License
 
-GrishaKey is released under the [GrishaKey License 1.0](LICENSE).
-
-- ✅ Use it for anything, including commercial use
-- ✅ Change it, share it, or sell it, with no need to publish your changes
-- ✅ Show your organization's name with `APP_NAME`
-- 📢 Keep **"Powered by GrishaKey by JonnyTech"** visible at the bottom of the navigation
-  and on the sign-in and sign-up pages, linked to [jonnytech.dev](https://jonnytech.dev)
+GrishaKey is released under the [GrishaKey License 2.0](LICENSE).
