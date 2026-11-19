@@ -1,6 +1,7 @@
 /* The dropdown under a login field. Dark by default; follows the saved theme. */
 :root, :root[data-theme="dark"] {
   --grad: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+  --glow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
   --bg: #0b1220; --line: #1e293b; --ink: #f1f5f9; --muted: #94a3b8;
   --tile: #0f2a20; --green: #22c55e; --hover: rgba(0, 181, 112, 0.16); --selected: rgba(0, 181, 112, 0.24); --red: #f87171;
   --input: #0d1628; --line-strong: #2a3a55;
@@ -80,8 +81,10 @@ body { display: flex; flex-direction: column; padding-bottom: 0; }
 .new-login-btn {
   width: 100%; padding: 10px; border: 0; border-radius: 10px; cursor: pointer;
   background: var(--grad); color: #fff; font: 600 13px/1 Inter, system-ui, sans-serif;
+  box-shadow: var(--glow); transition: transform 0.15s ease, filter 0.2s ease;
 }
 .new-login-btn:hover { filter: brightness(1.06); }
+.new-login-btn:active { transform: scale(0.98); }
 
 /* Sign-in inside the dropdown */
 .signin { display: flex; flex-direction: column; }
@@ -106,9 +109,10 @@ body { display: flex; flex-direction: column; padding-bottom: 0; }
 .signin-btn {
   margin-top: 14px; padding: 11px; border: 0; border-radius: 10px; cursor: pointer;
   background: var(--grad); color: #fff; font: 600 14px/1 Inter, system-ui, sans-serif;
-  box-shadow: 0 10px 24px -12px rgba(0, 181, 112, 0.7);
+  box-shadow: var(--glow); transition: transform 0.15s ease, filter 0.2s ease;
 }
 .signin-btn:hover { filter: brightness(1.06); }
+.signin-btn:active:not(:disabled) { transform: scale(0.98); }
 .signin-btn:disabled { opacity: 0.6; cursor: default; }
 .signin .error { display: flex; align-items: center; gap: 6px; justify-content: center; margin-top: 10px; }
 

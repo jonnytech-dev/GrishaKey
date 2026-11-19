@@ -570,6 +570,12 @@ def _apply_theme():
     ui.add_head_html("""
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
         <style>
+            :root {
+                /* Primary style: copied from .gk-seg-btn.gk-seg-on, used by every main button */
+                --gk-grad: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+                --gk-glow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
+            }
+
             .gradient-text {
                 background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
                 -webkit-background-clip: text;
@@ -582,10 +588,16 @@ def _apply_theme():
             /* Solid green buttons → gradient background */
             /* .q-btn + .gradient-bg = two classes, so it beats Quasar's .bg-primary */
             .q-btn.gradient-bg {
-                background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%) !important;
+                background: var(--gk-grad) !important;
                 color: #ffffff !important;
+                font-weight: 600;
+                box-shadow: var(--gk-glow) !important;
+                transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease !important;
             }
+            .q-btn.gradient-bg:before { box-shadow: none !important; }
+            .q-btn.gradient-bg .q-focus-helper { display: none; }
             .q-btn.gradient-bg:hover { filter: brightness(1.06); }
+            .q-btn.gradient-bg:active { transform: scale(0.98); }
 
             /* Highlighted nav pill → gradient text */
             .q-btn.gradient-text-btn .q-btn__content {
@@ -981,9 +993,9 @@ def _apply_theme():
             .gk-seg-btn:hover { color: #0f172a; }
             .gk-seg-btn:focus-visible { outline: 2px solid #00B570; outline-offset: 2px; }
             .gk-seg-btn.gk-seg-on {
-                background: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+                background: var(--gk-grad);
                 color: #ffffff;
-                box-shadow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
+                box-shadow: var(--gk-glow);
             }
 
             /* Filter + sort bar: side by side on wide screens, stacked on phones */

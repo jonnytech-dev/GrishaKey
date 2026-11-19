@@ -3,6 +3,7 @@
 /* Dark (default, and when the system is dark) */
 :root, :root[data-theme="dark"] {
   --grad: linear-gradient(90deg, #00994C 0%, #00B570 50%, #00B9BE 100%);
+  --glow: 0 10px 22px -12px rgba(0, 153, 76, 0.7);
   --bg: #0b1220; --surface: #111a2e; --input: #0d1628; --line: #1e293b; --line-strong: #2a3a55;
   --ink: #f1f5f9; --text: #e2e8f0; --muted: #94a3b8;
   --green: #22c55e; --tile: #0f2a20; --tint: rgba(0, 181, 112, 0.14); --tint-strong: rgba(0, 181, 112, 0.24);
@@ -61,9 +62,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .primary {
   width: 100%; padding: 13px; border-radius: 12px; color: #fff; background: var(--grad);
-  box-shadow: 0 10px 24px -12px rgba(0, 181, 112, 0.7);
+  box-shadow: var(--glow); transition: transform 0.15s ease, filter 0.2s ease;
 }
 .primary:hover { filter: brightness(1.06); }
+.primary:active { transform: scale(0.98); }
 .link { background: none; color: var(--muted); padding: 10px 6px; border-radius: 8px; }
 .link:hover { color: var(--ink); }
 .icon-btn {
@@ -133,7 +135,12 @@ select { appearance: none; padding-right: 36px; cursor: pointer;
 .new-vault label { margin-top: 0; }
 .new-vault-row { display: flex; gap: 8px; }
 .new-vault-row input { flex: 1; min-width: 0; }
-.small-primary { padding: 0 14px; border-radius: 10px; color: #fff; background: var(--grad); white-space: nowrap; }
+.small-primary {
+  padding: 0 14px; border-radius: 10px; color: #fff; background: var(--grad); white-space: nowrap;
+  box-shadow: var(--glow); transition: transform 0.15s ease, filter 0.2s ease;
+}
+.small-primary:hover { filter: brightness(1.06); }
+.small-primary:active { transform: scale(0.98); }
 
 /* Theme button: bottom-right corner */
 .theme-toggle {
@@ -174,7 +181,7 @@ select { appearance: none; padding-right: 36px; cursor: pointer;
 .gen-mode { display: flex; gap: 4px; padding: 3px; margin-bottom: 10px; border-radius: 10px; background: var(--input); border: 1px solid var(--line-strong); }
 .gen-mode-btn { flex: 1; padding: 7px 10px; border-radius: 8px; background: none; color: var(--muted); font-size: 13px; }
 .gen-mode-btn:hover { color: var(--ink); }
-.gen-mode-btn[aria-pressed="true"] { background: var(--grad); color: #fff; }
+.gen-mode-btn[aria-pressed="true"] { background: var(--grad); color: #fff; box-shadow: var(--glow); }
 .gen-select { flex: 1; padding-top: 7px; padding-bottom: 7px; font-size: 13px; }
 
 /* Vaults screen */
