@@ -1,6 +1,7 @@
 .venv/
 core/__pycache__/
-.pytest_cache
+.pytest_cache/
+.licenses/
 
 .env
 data/

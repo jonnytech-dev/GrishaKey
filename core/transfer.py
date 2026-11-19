@@ -4,7 +4,7 @@ import io
 from urllib.parse import urlparse
 from core.config import env_int
 
-MAX_IMPORT_MB = env_int("MAX_IMPORT_MB", 8, minimum=1, maximum=10) * 1024 * 1024   # in MB
+MAX_IMPORT_MB = env_int("MAX_IMPORT_MB", 8, minimum=1, maximum=10)  # in MB
 MAX_IMPORT_BYTES = MAX_IMPORT_MB * 1024 * 1024
 MAX_IMPORT_ROWS = env_int("MAX_IMPORT_ROWS", 5000, minimum=1, maximum=5000)     # in rows
 

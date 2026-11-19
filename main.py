@@ -158,15 +158,16 @@ def _credit_links(extra_classes: str = ""):
     # Small "Website · GitHub" links, with the required "Powered by GrishaKey by JonnyTech" under them.
     # The credit is required by the LICENSE. Do not tie it to APP_NAME or any setting.
     with ui.element("div").classes(f"gk-credit {extra_classes}"):
-        with ui.element("div").classes("gk-credit-links"):
-            with ui.link(target=WEBSITE_URL, new_tab=True).classes("gk-credit-link"):
-                ui.icon("language").style("font-size: 12px")
-                ui.label("Website")
-            ui.label("·").classes("gk-credit-dot")
-            with ui.link(target=GITHUB_URL, new_tab=True).classes("gk-credit-link"):
-                ui.html(GITHUB_ICON_SVG, sanitize=False).classes("flex items-center")
-                ui.label("GitHub")
-        ui.link(POWERED_BY_TEXT, POWERED_BY_URL, new_tab=True).classes("gk-powered")
+        # with ui.element("div").classes("gk-credit-links"):
+        #     with ui.link(target=WEBSITE_URL, new_tab=True).classes("gk-credit-link"):
+        #         ui.icon("language").style("font-size: 12px")
+        #         ui.label("Website")
+        #     ui.label("·").classes("gk-credit-dot")
+        #     with ui.link(target=GITHUB_URL, new_tab=True).classes("gk-credit-link"):
+        #         ui.html(GITHUB_ICON_SVG, sanitize=False).classes("flex items-center")
+        #         ui.label("GitHub")
+        # ui.link(POWERED_BY_TEXT, POWERED_BY_URL, new_tab=True).classes("gk-powered")
+        ui.label(POWERED_BY_TEXT).classes("gk-powered")
 
 # ========== Actions (run in a background thread, one DB connection each) ==========
 
@@ -717,6 +718,16 @@ def _apply_theme():
             }
             .gk-dialog-lg { width: min(94vw, 680px); }   /* for longer forms */
 
+            /* "Add people" row: one line on wide screens, stacks on phones */
+            .gk-add-row { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 8px; width: 100%; }
+            @media (max-width: 600px) {
+                .gk-add-row { flex-wrap: wrap; }
+                .gk-add-row > .gk-add-email { flex: 1 1 100%; }
+                .gk-add-row > .gk-add-role { flex: 1 1 auto; width: auto !important; }
+                /* Dialogs: a bit less padding so content has room */
+                .gk-dialog { padding: 20px !important; width: calc(100vw - 24px); }
+            }
+
             .gk-field-label {
                 font-size: 13px; font-weight: 600; color: #334155;
                 margin: 16px 0 6px;
@@ -1247,9 +1258,9 @@ def _dialog_header(icon: str, title: str, subtitle: str, tone: str = "green"):
     with ui.row().classes("items-center gap-3 no-wrap"):
         with ui.element("div").classes(f"rounded-xl p-2.5 {badge} flex"):
             ui.icon(icon).classes("text-2xl").style(f"color: {color}")
-        with ui.column().classes("gap-0"):
-            ui.label(title).classes("text-lg font-bold text-slate-900")
-            ui.label(subtitle).classes("text-sm text-slate-500")
+        with ui.column().classes("gap-0 min-w-0"):
+            ui.label(title).classes("text-lg font-bold text-slate-900 break-words")
+            ui.label(subtitle).classes("text-sm text-slate-500 break-words")
 
 
 def _field_label(text: str):
@@ -1426,10 +1437,10 @@ def _open_manage_vault_sharing(session, vault_id: str, vault_name: str):
 
         # Add someone: email + role + Add, in one line
         _field_label("Add people")
-        with ui.row().classes("w-full items-start no-wrap gap-2"):
-            email = _person_input(directory)
+        with ui.element("div").classes("gk-add-row"):
+            email = _person_input(directory).classes("gk-add-email")
             role = ui.select({"view": "Can view", "edit": "Can edit"}, value="view") \
-                .props("outlined dense").classes("gk-input").style("width: 140px")
+                .props("outlined dense").classes("gk-input gk-add-role").style("width: 140px")
             ui.button("Add", on_click=add).props("unelevated no-caps") \
                 .classes("rounded-lg px-5 font-semibold gradient-bg").style("height: 40px")
         if not USER_DIRECTORY:
@@ -1502,10 +1513,10 @@ def _open_manage_entry_sharing(session, entry):
 
         # Add someone: email + role + Add, in one line
         _field_label("Add people")
-        with ui.row().classes("w-full items-start no-wrap gap-2"):
-            email = _person_input(directory)
+        with ui.element("div").classes("gk-add-row"):
+            email = _person_input(directory).classes("gk-add-email")
             role = ui.select({"view": "Can view", "edit": "Can edit"}, value="view") \
-                .props("outlined dense").classes("gk-input").style("width: 140px")
+                .props("outlined dense").classes("gk-input gk-add-role").style("width: 140px")
             ui.button("Add", on_click=add).props("unelevated no-caps") \
                 .classes("rounded-lg px-5 font-semibold gradient-bg").style("height: 40px")
         if not USER_DIRECTORY:

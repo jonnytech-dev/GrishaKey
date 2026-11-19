@@ -94,10 +94,6 @@ It runs on your own server, and the app name can be changed with a setting, so a
 |---|---|
 | ![Trash](docs/screenshots/trash.png) | ![Help](docs/screenshots/help.png) |
 
-| Dark mode |
-|---|
-| <!-- SCREENSHOT: any page in dark mode. Save as docs/screenshots/dark-mode.png --> ![Dark mode](docs/screenshots/dark-mode.png) |
-
 ---
 
 ## Tech stack
@@ -207,11 +203,31 @@ The tables are created by `create_tables()` in [`core/storage.py`](core/storage.
 
 ## Getting started
 
-**1. Clone and install**
+Pick one way to run GrishaKey:
+
+| | Option 1: Python | Option 2: Docker |
+|---|---|---|
+| Best for | Trying it out, development | Running it day to day |
+| You need | Python 3.14 | Docker Desktop (or Docker Engine) |
+| Data lives in | `data/` in the project folder | The `grishakey-data` Docker volume |
+
+### Get the files (both options)
+
+Put GrishaKey in a folder you'll keep, for example `C:\GrishaKey` on Windows or `~/grishakey`
+on macOS and Linux. Either clone it:
 
 ```bash
-git clone https://github.com/jonnytech-dev/grishakey.git
-cd grishakey
+git clone https://github.com/jonnytech-dev/GrishaKey.git
+cd GrishaKey
+```
+
+or on GitHub click **Code → Download ZIP**, unzip it into that folder, and open a terminal there.
+
+### Option 1: Run with Python
+
+**1. Install**
+
+```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # macOS / Linux
@@ -226,14 +242,13 @@ Generate one (it must be at least 32 characters; this makes 64):
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-`main.py` reads its settings from environment variables. It doesn't load `.env` by itself, so set the secret in the terminal you run it from:
+`main.py` reads its settings from environment variables. It doesn't load `.env` by itself, so set
+the secret in the terminal you run it from:
 
 ```bash
 $env:STORAGE_SECRET = "paste-it-here"      # Windows PowerShell
 # export STORAGE_SECRET="paste-it-here"    # macOS / Linux
 ```
-
-For Docker, put it in `.env` instead (see [Run with Docker](#run-with-docker)).
 
 **3. Run**
 
@@ -241,11 +256,9 @@ For Docker, put it in `.env` instead (see [Run with Docker](#run-with-docker)).
 python main.py
 ```
 
-Open **http://127.0.0.1:9500** and create an account. Save your recovery code when it's shown.
+Open http://127.0.0.1:9500 and create an account. Save your recovery code when it's shown.
 
----
-
-## Run with Docker
+### Option 2: Run with Docker
 
 `compose.yaml` builds the image from the `Dockerfile` and runs it.
 
@@ -260,10 +273,17 @@ Open **http://127.0.0.1:9500** and create an account. Save your recovery code wh
 **1. Create your `.env`**
 
 ```bash
-cp .env.example .env
+cp .env.example .env                       # macOS / Linux
+# Copy-Item .env.example .env              # Windows PowerShell
 ```
 
-Put a generated secret after `STORAGE_SECRET=` (see step 2 above).
+Generate a secret and put it after `STORAGE_SECRET=` in `.env`:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+No Python? Any random string of 32 or more characters works, for example from a password generator.
 
 **2. Start it**
 
@@ -271,9 +291,7 @@ Put a generated secret after `STORAGE_SECRET=` (see step 2 above).
 docker compose up -d --build
 ```
 
-Open **http://127.0.0.1:9500**.
-
-> **Note:** the `Dockerfile` sets `GRISHAKEY_HOST=0.0.0.0` and `GRISHAKEY_PORT=9500`, but `main.py` doesn't read them yet. It always listens on `127.0.0.1:9500`, which inside a container can't be reached through the published port.
+Open http://127.0.0.1:9500 and create an account. Save your recovery code when it's shown.
 
 **Back up the data**
 
@@ -283,16 +301,20 @@ docker run --rm --volumes-from grishakey -v "${PWD}:/backup" alpine tar czf /bac
 docker compose start
 ```
 
-The backup holds your encrypted database. Keep it somewhere safe, and never commit it (`*.tgz` is in `.gitignore`).
+The backup holds your encrypted database. Keep it somewhere safe, and never commit it
+(`*.tgz` is in `.gitignore`).
 
 **Update**
 
 ```bash
-git pull
+git pull                      # or download the ZIP again into the same folder
 docker compose up -d --build
 ```
 
-**Other devices:** to reach it from other devices, put a reverse proxy with HTTPS (Caddy, Nginx, Traefik) in front of it. If you change the port to `"9500:9500"`, use HTTPS.
+Your data stays in the volume, so updating never touches it.
+
+**Other devices:** to reach it from other devices, put a reverse proxy with HTTPS (Caddy, Nginx,
+Traefik) in front of it. If you change the port to `"9500:9500"`, use HTTPS.
 
 ---
 
@@ -312,10 +334,11 @@ and lets you save new ones without opening the app. It works in Chrome, Edge, an
 
 ### Screenshots
 
-| Popup | Fill from login fields |
+| Sign in | Popup |
 |---|---|
-| ![Popup](docs/screenshots/extension/popup-home.png) | ![In-page dropdown](docs/screenshots/extension/inline-dropdown.png) |
-| ![New login](docs/screenshots/extension/new-login.png) | ![Options](docs/screenshots/extension/options.png) |
+| ![Sign in](docs/screenshots/extension/popup_signin.png) | ![Popup](docs/screenshots/extension/popup_home.png) |
+| ![In-page dropdown](docs/screenshots/extension/inline_dropdown.png) | ![New login](docs/screenshots/extension/new_login.png) |
+| ![Options](docs/screenshots/extension/options.png) | |
 
 ### Before you start
 

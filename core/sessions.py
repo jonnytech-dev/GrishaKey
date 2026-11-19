@@ -6,7 +6,7 @@ from core.models import Session
 from core.config import env_int
 
 # MIN 1 minutes and MAX 24 hours
-TIMEOUT_SECONDS = env_int("TIMEOUT_SECONDS", 15, minimum=5, maxiumum=1440) * 60
+TIMEOUT_SECONDS = env_int("TIMEOUT_SECONDS", 15, minimum=5, maximum=1440) * 60
 # A session ends after this long even if it's used the whole time (a stolen token can't live forever)
 # Converts minutes to hours
 MAX_LIFETIME_SECONDS = env_int("MAX_LIFETIME_HOURS", 12, minimum=1, maximum=720) * 60 * 60
