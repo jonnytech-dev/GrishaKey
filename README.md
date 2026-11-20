@@ -556,4 +556,10 @@ The suite covers encryption, labels and tamper detection, login lockout and timi
 
 ## License
 
-GrishaKey is released under the [GrishaKey License 2.0](LICENSE).
+GrishaKey™ is open source under the [Apache License 2.0](LICENSE).
+
+- ✅ Use it, change it, or share it for any purpose
+- 📄 Keep the copyright notices and the [NOTICE](NOTICE) file in copies you share
+- ™ "GrishaKey" and "JonnyTech" are trademarks of JonnyTech.
+
+Created by [JonnyTech](https://jonnytech.dev).
