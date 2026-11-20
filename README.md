@@ -4,7 +4,7 @@
 
 [🌐 Website](https://grishakey.jonnytech.dev) · [💻 GitHub](https://github.com/jonnytech-dev/grishakey) · [JonnyTech](https://jonnytech.dev)
 
-**A self-hosted password manager for teams, families, and organizations.**
+**Open source, self-hosted alternative to NordPass, Bitwarden, and 1Password. Encrypted vaults on your own server, simple sharing, and a browser extension.**
 Encrypted vaults, simple sharing, and a clean interface, built in Python.
 
 <!-- SCREENSHOT: hero image (dashboard). Save as docs/screenshots/dashboard.png -->
